@@ -33,6 +33,18 @@ header {
     box-shadow: 0 2px 4px rgba(0,0,0,0.05);
 }
 
+.logo-container {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.logo-img {
+    width: 42px;
+    height: 42px;
+    object-fit: contain;
+}
+
 .logo-container h1 {
     font-size: 1.4rem;
     color: #2c3e50;
