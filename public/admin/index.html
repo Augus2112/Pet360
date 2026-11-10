@@ -3,10 +3,62 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Administración</title>
+  <meta name="theme-color" content="#f5f2eb">
+  <title>Acceso administrador | Pet360</title>
   <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
+  <main class="admin-page">
+    <section class="login-card" aria-labelledby="login-title">
+      <a class="brand" href="/" aria-label="Pet360, volver al catálogo">
+        <span class="brand-mark" aria-hidden="true">P</span>
+        <span>Pet<span class="brand-accent">360</span></span>
+      </a>
+
+      <div class="login-heading">
+        <p class="eyebrow">Panel de administración</p>
+        <h1 id="login-title">Qué bueno verte</h1>
+        <p class="login-description">Inicia sesión para administrar el catálogo de tu tienda.</p>
+      </div>
+
+      <form class="login-form" id="login-form">
+        <label for="username">Usuario</label>
+        <input
+          id="username"
+          name="username"
+          type="text"
+          placeholder="Ingresa tu usuario"
+          autocomplete="username"
+          required
+        >
+
+        <label for="password">Contraseña</label>
+        <input
+          id="password"
+          name="password"
+          type="password"
+          placeholder="Ingresa tu contraseña"
+          autocomplete="current-password"
+          required
+        >
+
+        <button type="submit">Iniciar sesión <span aria-hidden="true">→</span></button>
+        <p class="form-message" id="form-message" role="status" aria-live="polite"></p>
+      </form>
+
+      <p class="login-footer">Tu espacio para cuidar cada detalle de tu tienda.</p>
+    </section>
+    <aside class="admin-illustration" aria-label="Administración sencilla para tu tienda de mascotas">
+      <div class="illustration-content">
+        <span class="illustration-icon" aria-hidden="true">🐾</span>
+        <p class="eyebrow">Todo en un solo lugar</p>
+        <h2>Tu catálogo, siempre listo para tus clientes.</h2>
+        <p>Organiza tus productos y categorías de manera fácil y rápida.</p>
+      </div>
+      <span class="decoration decoration-one" aria-hidden="true"></span>
+      <span class="decoration decoration-two" aria-hidden="true"></span>
+    </aside>
+  </main>
   <script src="js/admin.js"></script>
 </body>
 </html>

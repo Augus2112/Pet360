@@ -3,8 +3,9 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 
 const app = express();
+const projectRoot = path.join(__dirname, '..');
 const port = process.env.PORT || 3000;
-const catalogPath = path.join(__dirname, 'data', 'productos.json');
+const catalogPath = path.join(projectRoot, 'data', 'productos.json');
 
 app.get('/api/catalogo', async (req, res, next) => {
   try {
@@ -15,8 +16,8 @@ app.get('/api/catalogo', async (req, res, next) => {
   }
 });
 
-app.use('/admin', express.static(path.join(__dirname, 'public', 'admin')));
-app.use('/cliente', express.static(path.join(__dirname, 'public', 'cliente')));
+app.use('/admin', express.static(path.join(projectRoot, 'public', 'admin')));
+app.use('/cliente', express.static(path.join(projectRoot, 'public', 'cliente')));
 
 app.get('/', (req, res) => {
   res.redirect('/cliente/');
