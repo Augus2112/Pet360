@@ -22,8 +22,14 @@ body {
   margin: 0;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 button,
-input {
+input,
+textarea,
+select {
   font: inherit;
 }
 
@@ -177,6 +183,360 @@ h1 {
   line-height: 1.5;
 }
 
+.login-success {
+  margin-top: 34px;
+}
+
+.success-message {
+  margin: 0 0 18px;
+  color: #555;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.logout-button {
+  min-height: 46px;
+  padding: 0 16px;
+  border: 1px solid #d5d5d5;
+  border-radius: 10px;
+  background: #fff;
+  color: #252525;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.logout-button:hover {
+  background: #f5f5f5;
+}
+
+.logout-button:focus-visible {
+  outline: 3px solid #aaa;
+  outline-offset: 3px;
+}
+
+.admin-page.dashboard-active {
+  display: block;
+  padding: clamp(18px, 4vw, 52px);
+}
+
+.dashboard {
+  width: min(100%, 1180px);
+  margin: 0 auto;
+}
+
+.dashboard-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 8px 0 30px;
+  border-bottom: 1px solid #e8e8e8;
+}
+
+.dashboard-header .brand {
+  margin-bottom: 30px;
+}
+
+.dashboard-eyebrow {
+  margin-bottom: 8px;
+}
+
+.dashboard-header h1 {
+  font-size: clamp(30px, 4vw, 42px);
+}
+
+.dashboard-header .login-description {
+  margin-top: 8px;
+}
+
+.dashboard-message {
+  min-height: 24px;
+  margin: 18px 0 4px;
+  color: #555;
+  font-size: 14px;
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 20px;
+}
+
+.dashboard-card {
+  min-width: 0;
+  padding: 26px;
+  border: 1px solid #e5e5e5;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.card-heading h2 {
+  margin: 0;
+  font-size: 23px;
+  letter-spacing: -0.035em;
+}
+
+.card-heading > p:last-child {
+  margin: 8px 0 0;
+  color: #737373;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.card-heading .eyebrow {
+  margin-bottom: 8px;
+}
+
+.dashboard-form {
+  display: grid;
+  gap: 9px;
+  margin-top: 22px;
+}
+
+.dashboard-form label {
+  margin-top: 7px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.dashboard-form input,
+.dashboard-form textarea,
+.dashboard-form select {
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 12px;
+  border: 1px solid #e2e2e2;
+  border-radius: 9px;
+  outline: none;
+  background: #fff;
+  color: #252525;
+}
+
+.dashboard-form textarea {
+  min-height: 92px;
+  resize: vertical;
+}
+
+.dashboard-form input:focus,
+.dashboard-form textarea:focus,
+.dashboard-form select:focus {
+  border-color: #777;
+  box-shadow: 0 0 0 3px rgb(0 0 0 / 8%);
+}
+
+.dashboard-form input[type='file'] {
+  padding: 8px;
+  color: #737373;
+  font-size: 12px;
+}
+
+.dashboard-form button {
+  min-height: 46px;
+  margin-top: 10px;
+  padding: 0 16px;
+  border: 1px solid #d5d5d5;
+  border-radius: 9px;
+  background: #fff;
+  color: #252525;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.dashboard-form button:hover {
+  background: #f5f5f5;
+}
+
+.dashboard-form button:focus-visible {
+  outline: 3px solid #aaa;
+  outline-offset: 3px;
+}
+
+.dashboard-form button:disabled,
+.logout-button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  gap: 12px;
+}
+
+.form-row > div {
+  display: grid;
+  gap: 9px;
+}
+
+.category-list,
+.product-list {
+  display: grid;
+  gap: 9px;
+  margin: 22px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.category-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 44px;
+  padding: 9px 12px;
+  border: 1px solid #ededed;
+  border-radius: 9px;
+  color: #404040;
+  font-size: 14px;
+}
+
+.category-item > span:first-child {
+  overflow: hidden;
+  flex: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.category-item > span:nth-child(2) {
+  color: #888;
+  flex: 0 0 auto;
+  font-size: 12px;
+}
+
+.category-actions,
+.product-actions,
+.dialog-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.category-actions button,
+.product-actions button,
+.dialog-actions button {
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid #dedede;
+  border-radius: 7px;
+  background: #fff;
+  color: #333;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.category-actions button:hover,
+.product-actions button:hover,
+.dialog-actions button:hover {
+  background: #f5f5f5;
+}
+
+.category-actions button:focus-visible,
+.product-actions button:focus-visible,
+.dialog-actions button:focus-visible {
+  outline: 3px solid #aaa;
+  outline-offset: 2px;
+}
+
+.product-card {
+  grid-column: 1 / -1;
+}
+
+.product-list {
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+
+.product-item {
+  overflow: hidden;
+  border: 1px solid #ededed;
+  border-radius: 10px;
+}
+
+.product-item img {
+  display: block;
+  width: 100%;
+  height: 150px;
+  object-fit: cover;
+  background: #f5f5f5;
+}
+
+.product-info {
+  padding: 13px;
+}
+
+.product-info h3 {
+  overflow: hidden;
+  margin: 0;
+  font-family: 'Manrope', sans-serif;
+  font-size: 15px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.product-info p {
+  margin: 7px 0 0;
+  color: #737373;
+  font-size: 13px;
+}
+
+.product-info .product-price {
+  color: #252525;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.product-actions {
+  margin-top: 12px;
+}
+
+.product-actions button {
+  flex: 1;
+}
+
+.editor-dialog {
+  width: min(100% - 32px, 540px);
+  max-height: min(90vh, 760px);
+  padding: 26px;
+  border: 1px solid #dedede;
+  border-radius: 14px;
+  background: #fff;
+  color: #252525;
+}
+
+.editor-dialog::backdrop {
+  background: rgb(0 0 0 / 35%);
+}
+
+.editor-dialog .dashboard-form {
+  margin-top: 0;
+}
+
+.editor-dialog h2 {
+  margin: 0 0 8px;
+  font-size: 23px;
+}
+
+.dialog-actions {
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+.dialog-actions button {
+  min-height: 42px;
+  padding: 0 14px;
+  font-size: 13px;
+}
+
+.dialog-actions .secondary-button {
+  margin-top: 10px;
+}
+
+.empty-state {
+  margin: 18px 0 0;
+  color: #737373;
+  font-size: 14px;
+}
+
 .login-footer {
   margin: 40px 0 0;
   color: #777;
@@ -294,6 +654,14 @@ h1 {
     padding: 34px;
   }
 
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .product-card {
+    grid-column: auto;
+  }
+
   .illustration-content h2 {
     max-width: 400px;
     font-size: clamp(32px, 8vw, 46px);
@@ -313,5 +681,26 @@ h1 {
     min-height: 320px;
     padding: 26px;
     border-radius: 18px;
+  }
+
+  .admin-page.dashboard-active {
+    padding: 16px 12px;
+  }
+
+  .dashboard-header {
+    flex-direction: column;
+  }
+
+  .dashboard-header .brand {
+    margin-bottom: 24px;
+  }
+
+  .dashboard-card {
+    padding: 20px 16px;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
+    gap: 9px;
   }
 }
