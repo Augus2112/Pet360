@@ -228,7 +228,6 @@ header {
     margin-bottom: 0.8rem;
 }
 
-/* Selector de cantidad en la tarjeta */
 .product-actions-card {
     margin-top: auto;
     display: flex;
@@ -293,7 +292,6 @@ header {
     background: var(--primary-green-hover);
 }
 
-/* Modales */
 .modal {
     display: none;
     position: fixed;

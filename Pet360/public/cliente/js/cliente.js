@@ -16,6 +16,7 @@ const cartBadge = document.getElementById('cartBadge');
 const cartItemsList = document.getElementById('cartItemsList');
 const cartTotalText = document.getElementById('cartTotalText');
 const checkoutForm = document.getElementById('checkoutForm');
+const clientNameInput = document.getElementById('clientName');
 
 // Elementos del Modal de Producto
 const productModal = document.getElementById('productModal');
@@ -41,7 +42,6 @@ function cargarProductos() {
             productos = [];
         }
     } else {
-        // Datos de respaldo iniciales con descripción incluida
         productos = [
             { id: 1, nombre: 'Alimento Perros 5kg', precio: 18.00, categoria: 'Alimento', descripcion: 'Alimento premium formulado para perros adultos de todas las razas, rico en nutrientes y proteínas esenciales.', imagen: 'https://images.unsplash.com/photo-1589924691995-400dc9ecc119?w=500' },
             { id: 2, nombre: 'Juguete Mordedera', precio: 4.50, categoria: 'Accesorios', descripcion: 'Juguete resistente de goma ideal para la limpieza dental y entretenimiento diario de tu mascota.', imagen: 'https://images.unsplash.com/photo-1535930891776-0c2dfb7fda1a?w=500' },
@@ -116,7 +116,6 @@ function renderizarProductos(lista) {
         productsGrid.appendChild(card);
     });
 
-    // Abrir modal de detalles al hacer clic en la imagen o el título
     productsGrid.querySelectorAll('.product-img-container, .product-title').forEach(el => {
         el.addEventListener('click', (e) => {
             const id = e.currentTarget.dataset.id;
@@ -124,7 +123,6 @@ function renderizarProductos(lista) {
         });
     });
 
-    // Controladores de cantidad (- y +) en cada tarjeta
     productsGrid.querySelectorAll('.btn-qty').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const id = e.target.dataset.id;
@@ -139,7 +137,6 @@ function renderizarProductos(lista) {
         });
     });
 
-    // Botón Agregar al Carrito
     productsGrid.querySelectorAll('.btn-add-cart').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const id = e.target.dataset.id;
@@ -159,7 +156,6 @@ function abrirDetalleProducto(id) {
     modalProductTitle.textContent = producto.nombre;
     modalProductCategory.textContent = `Categoría: ${producto.categoria}`;
     modalProductPrice.textContent = `$${Number(producto.precio).toFixed(2)}`;
-    // Si tu compañero aún no pone la descripción, muestra un texto por defecto
     modalProductDesc.textContent = producto.descripcion || "Este producto no cuenta con una descripción detallada por el momento.";
 
     productModal.classList.add('active');
@@ -240,7 +236,6 @@ function configurarEventos() {
         }
     });
 
-    // Eventos para cerrar el modal de detalles del producto
     closeProductModal.addEventListener('click', () => {
         productModal.classList.remove('active');
     });
@@ -251,6 +246,13 @@ function configurarEventos() {
         }
     });
 
+    // Validación en tiempo real: Evitar que se escriban números en el campo de nombre
+    if (clientNameInput) {
+        clientNameInput.addEventListener('input', (e) => {
+            e.target.value = e.target.value.replace(/[0-9]/g, '');
+        });
+    }
+
     checkoutForm.addEventListener('submit', (e) => {
         e.preventDefault();
         if (carrito.length === 0) {
@@ -258,7 +260,15 @@ function configurarEventos() {
             return;
         }
 
-        const nombre = document.getElementById('clientName').value.trim();
+        const nombre = clientNameInput.value.trim();
+        
+        // Comprobación adicional al enviar el formulario
+        const soloLetrasRegex = /^[A-Za-zÁÉÍÓÚáéíóúÑñ\s]+$/;
+        if (!soloLetrasRegex.test(nombre)) {
+            alert("Por favor, ingresa un nombre válido que contenga solo letras.");
+            return;
+        }
+
         const telefonoTienda = "584120000000";
 
         let mensaje = `*NUEVO PEDIDO - PET360*\n\n`;
