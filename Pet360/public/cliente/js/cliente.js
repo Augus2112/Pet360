@@ -17,6 +17,15 @@ const cartItemsList = document.getElementById('cartItemsList');
 const cartTotalText = document.getElementById('cartTotalText');
 const checkoutForm = document.getElementById('checkoutForm');
 
+// Elementos del Modal de Producto
+const productModal = document.getElementById('productModal');
+const closeProductModal = document.getElementById('closeProductModal');
+const modalProductImg = document.getElementById('modalProductImg');
+const modalProductTitle = document.getElementById('modalProductTitle');
+const modalProductCategory = document.getElementById('modalProductCategory');
+const modalProductPrice = document.getElementById('modalProductPrice');
+const modalProductDesc = document.getElementById('modalProductDesc');
+
 // Inicializar la aplicación al cargar la página
 document.addEventListener('DOMContentLoaded', () => {
     cargarProductos();
@@ -32,11 +41,11 @@ function cargarProductos() {
             productos = [];
         }
     } else {
-        // Datos de respaldo iniciales si el localStorage está vacío
+        // Datos de respaldo iniciales con descripción incluida
         productos = [
-            { id: 1, nombre: 'Alimento Perros 5kg', precio: 18.00, categoria: 'Alimento', imagen: 'https://images.unsplash.com/photo-1589924691995-400dc9ecc119?w=500' },
-            { id: 2, nombre: 'Juguete Mordedera', precio: 4.50, categoria: 'Accesorios', imagen: 'https://images.unsplash.com/photo-1535930891776-0c2dfb7fda1a?w=500' },
-            { id: 3, nombre: 'Arena para Gatos 4kg', precio: 7.00, categoria: 'Gatos', imagen: 'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=500' }
+            { id: 1, nombre: 'Alimento Perros 5kg', precio: 18.00, categoria: 'Alimento', descripcion: 'Alimento premium formulado para perros adultos de todas las razas, rico en nutrientes y proteínas esenciales.', imagen: 'https://images.unsplash.com/photo-1589924691995-400dc9ecc119?w=500' },
+            { id: 2, nombre: 'Juguete Mordedera', precio: 4.50, categoria: 'Accesorios', descripcion: 'Juguete resistente de goma ideal para la limpieza dental y entretenimiento diario de tu mascota.', imagen: 'https://images.unsplash.com/photo-1535930891776-0c2dfb7fda1a?w=500' },
+            { id: 3, nombre: 'Arena para Gatos 4kg', precio: 7.00, categoria: 'Gatos', descripcion: 'Arena aglutinante de alta absorción que neutraliza los malos olores de manera eficaz.', imagen: 'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=500' }
         ];
         localStorage.setItem(STORAGE_KEY, JSON.stringify(productos));
     }
@@ -86,9 +95,11 @@ function renderizarProductos(lista) {
         const card = document.createElement('div');
         card.className = 'product-card';
         card.innerHTML = `
-            <img src="${producto.imagen || 'https://via.placeholder.com/240x170'}" alt="${producto.nombre}" class="product-img">
+            <div class="product-img-container" data-id="${producto.id}">
+                <img src="${producto.imagen || 'https://via.placeholder.com/240x170'}" alt="${producto.nombre}" class="product-img">
+            </div>
             <div class="product-info">
-                <h3 class="product-title">${producto.nombre}</h3>
+                <h3 class="product-title" data-id="${producto.id}">${producto.nombre}</h3>
                 <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 0.4rem;">Categoría: ${producto.categoria}</p>
                 <div class="product-price">$${Number(producto.precio).toFixed(2)}</div>
                 
@@ -103,6 +114,14 @@ function renderizarProductos(lista) {
             </div>
         `;
         productsGrid.appendChild(card);
+    });
+
+    // Abrir modal de detalles al hacer clic en la imagen o el título
+    productsGrid.querySelectorAll('.product-img-container, .product-title').forEach(el => {
+        el.addEventListener('click', (e) => {
+            const id = e.currentTarget.dataset.id;
+            abrirDetalleProducto(id);
+        });
     });
 
     // Controladores de cantidad (- y +) en cada tarjeta
@@ -131,6 +150,21 @@ function renderizarProductos(lista) {
     });
 }
 
+function abrirDetalleProducto(id) {
+    const producto = productos.find(p => p.id == id);
+    if (!producto) return;
+
+    modalProductImg.src = producto.imagen || 'https://via.placeholder.com/400x300';
+    modalProductImg.alt = producto.nombre;
+    modalProductTitle.textContent = producto.nombre;
+    modalProductCategory.textContent = `Categoría: ${producto.categoria}`;
+    modalProductPrice.textContent = `$${Number(producto.precio).toFixed(2)}`;
+    // Si tu compañero aún no pone la descripción, muestra un texto por defecto
+    modalProductDesc.textContent = producto.descripcion || "Este producto no cuenta con una descripción detallada por el momento.";
+
+    productModal.classList.add('active');
+}
+
 function agregarAlCarrito(id, cantidad) {
     const productoEncontrado = productos.find(p => p.id == id);
     if (!productoEncontrado) return;
@@ -149,7 +183,6 @@ function agregarAlCarrito(id, cantidad) {
 
     actualizarCarritoUI();
     
-    // Regresar el input de esa tarjeta a 1
     const input = document.getElementById(`qty-${id}`);
     if (input) input.value = 1;
 }
@@ -185,7 +218,6 @@ function actualizarCarritoUI() {
     cartTotalText.textContent = `Total: $${total.toFixed(2)}`;
 }
 
-// Función global para poder llamarla desde el HTML generado dinámicamente en el carrito
 window.eliminarDelCarrito = function(index) {
     carrito.splice(index, 1);
     actualizarCarritoUI();
@@ -208,6 +240,17 @@ function configurarEventos() {
         }
     });
 
+    // Eventos para cerrar el modal de detalles del producto
+    closeProductModal.addEventListener('click', () => {
+        productModal.classList.remove('active');
+    });
+
+    productModal.addEventListener('click', (e) => {
+        if (e.target === productModal) {
+            productModal.classList.remove('active');
+        }
+    });
+
     checkoutForm.addEventListener('submit', (e) => {
         e.preventDefault();
         if (carrito.length === 0) {
@@ -216,7 +259,7 @@ function configurarEventos() {
         }
 
         const nombre = document.getElementById('clientName').value.trim();
-        const telefonoTienda = "584120000000"; // Número de WhatsApp de la tienda
+        const telefonoTienda = "584120000000";
 
         let mensaje = `*NUEVO PEDIDO - PET360*\n\n`;
         mensaje += `*Cliente:* ${nombre}\n\n`;

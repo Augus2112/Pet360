@@ -41,6 +41,22 @@
         </section>
     </main>
 
+    <!-- Modal de Detalles del Producto -->
+    <div class="modal" id="productModal">
+        <div class="modal-content product-detail-content">
+            <button class="close-modal" id="closeProductModal">&times;</button>
+            <img id="modalProductImg" src="" alt="" class="modal-product-img">
+            <div class="modal-product-info">
+                <h2 id="modalProductTitle"></h2>
+                <p id="modalProductCategory" class="modal-category"></p>
+                <div id="modalProductPrice" class="modal-price"></div>
+                <hr style="margin: 0.8rem 0; border: 0; border-top: 1px solid var(--border-color);">
+                <h4 style="margin-bottom: 0.4rem; font-size: 0.95rem; color: var(--brand-blue-dark);">Descripción del producto:</h4>
+                <p id="modalProductDesc" class="modal-desc"></p>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal del Carrito y Formulario de WhatsApp -->
     <div class="modal" id="cartModal">
         <div class="modal-content">
