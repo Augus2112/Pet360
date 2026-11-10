@@ -1,7 +1,5 @@
-// Llave de localStorage compartida con el Admin
-const STORAGE_KEY = 'productos_pet360';
-
 let productos = [];
+let categorias = [];
 let carrito = [];
 let categoriaActual = 'todos';
 
@@ -33,37 +31,52 @@ document.addEventListener('DOMContentLoaded', () => {
     configurarEventos();
 });
 
-function cargarProductos() {
-    const datos = localStorage.getItem(STORAGE_KEY);
-    if (datos) {
-        try {
-            productos = JSON.parse(datos);
-        } catch (e) {
-            productos = [];
+async function cargarProductos() {
+    productsGrid.innerHTML = '<p style="grid-column: 1/-1; text-align: center; color: #64748b; padding: 2rem;">Cargando catálogo...</p>';
+
+    try {
+        const response = await fetch('/api/catalogo', { cache: 'no-store' });
+        if (!response.ok) {
+            throw new Error('No se pudo cargar el catálogo.');
         }
-    } else {
-        productos = [
-            { id: 1, nombre: 'Alimento Perros 5kg', precio: 18.00, categoria: 'Alimento', descripcion: 'Alimento premium formulado para perros adultos de todas las razas, rico en nutrientes y proteínas esenciales.', imagen: 'https://images.unsplash.com/photo-1589924691995-400dc9ecc119?w=500' },
-            { id: 2, nombre: 'Juguete Mordedera', precio: 4.50, categoria: 'Accesorios', descripcion: 'Juguete resistente de goma ideal para la limpieza dental y entretenimiento diario de tu mascota.', imagen: 'https://images.unsplash.com/photo-1535930891776-0c2dfb7fda1a?w=500' },
-            { id: 3, nombre: 'Arena para Gatos 4kg', precio: 7.00, categoria: 'Gatos', descripcion: 'Arena aglutinante de alta absorción que neutraliza los malos olores de manera eficaz.', imagen: 'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=500' }
-        ];
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(productos));
+
+        const catalogo = await response.json();
+        if (!Array.isArray(catalogo.categorias) || !Array.isArray(catalogo.productos)) {
+            throw new Error('El catálogo tiene un formato no válido.');
+        }
+
+        categorias = catalogo.categorias;
+        const nombresCategorias = new Map(categorias.map(categoria => [categoria.id, categoria.nombre]));
+        productos = catalogo.productos.map(producto => ({
+            ...producto,
+            categoria: nombresCategorias.get(producto.categoriaId) || 'Sin categoría'
+        }));
+
+        renderizarCategorias();
+        filtrarYMostrarProductos();
+    } catch (error) {
+        productos = [];
+        categorias = [];
+        renderizarCategorias();
+        productsGrid.innerHTML = `<p style="grid-column: 1/-1; text-align: center; color: #64748b; padding: 2rem;">${escapeHTML(error.message || 'No se pudo conectar con el catálogo.')}</p>`;
     }
-    renderizarCategorias();
-    filtrarYMostrarProductos();
 }
 
 function renderizarCategorias() {
-    const categorias = ['todos', ...new Set(productos.map(p => p.categoria))];
     categoryFilters.innerHTML = '';
-    
-    categorias.forEach(cat => {
+
+    const filtros = [
+        { id: 'todos', nombre: 'Todos' },
+        ...categorias.map(categoria => ({ id: String(categoria.id), nombre: categoria.nombre }))
+    ];
+
+    filtros.forEach(cat => {
         const btn = document.createElement('button');
-        btn.className = `btn-filter ${cat === categoriaActual ? 'active' : ''}`;
-        btn.textContent = cat.charAt(0).toUpperCase() + cat.slice(1);
-        btn.dataset.category = cat;
+        btn.className = `btn-filter ${cat.id === categoriaActual ? 'active' : ''}`;
+        btn.textContent = cat.nombre;
+        btn.dataset.category = cat.id;
         btn.addEventListener('click', () => {
-            categoriaActual = cat;
+            categoriaActual = cat.id;
             document.querySelectorAll('.btn-filter').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             filtrarYMostrarProductos();
@@ -76,7 +89,7 @@ function filtrarYMostrarProductos() {
     const textoBusqueda = searchInput.value.toLowerCase().trim();
     
     const filtrados = productos.filter(p => {
-        const coincideCategoria = categoriaActual === 'todos' || p.categoria.toLowerCase() === categoriaActual.toLowerCase();
+        const coincideCategoria = categoriaActual === 'todos' || String(p.categoriaId) === categoriaActual;
         const coincideTexto = p.nombre.toLowerCase().includes(textoBusqueda);
         return coincideCategoria && coincideTexto;
     });
@@ -95,21 +108,21 @@ function renderizarProductos(lista) {
         const card = document.createElement('div');
         card.className = 'product-card';
         card.innerHTML = `
-            <div class="product-img-container" data-id="${producto.id}">
-                <img src="${producto.imagen || 'https://via.placeholder.com/240x170'}" alt="${producto.nombre}" class="product-img">
+            <div class="product-img-container" data-id="${escapeHTML(producto.id)}">
+                <img src="${escapeHTML(producto.imagen || 'https://via.placeholder.com/240x170')}" alt="${escapeHTML(producto.nombre)}" class="product-img">
             </div>
             <div class="product-info">
-                <h3 class="product-title" data-id="${producto.id}">${producto.nombre}</h3>
-                <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 0.4rem;">Categoría: ${producto.categoria}</p>
+                <h3 class="product-title" data-id="${escapeHTML(producto.id)}">${escapeHTML(producto.nombre)}</h3>
+                <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 0.4rem;">Categoría: ${escapeHTML(producto.categoria)}</p>
                 <div class="product-price">$${Number(producto.precio).toFixed(2)}</div>
                 
                 <div class="product-actions-card">
                     <div class="qty-selector">
-                        <button type="button" class="btn-qty minus" data-id="${producto.id}">-</button>
-                        <input type="number" id="qty-${producto.id}" class="input-qty" value="1" min="1" max="99">
-                        <button type="button" class="btn-qty plus" data-id="${producto.id}">+</button>
+                        <button type="button" class="btn-qty minus" data-id="${escapeHTML(producto.id)}">-</button>
+                        <input type="number" id="qty-${escapeHTML(producto.id)}" class="input-qty" value="1" min="1" max="99">
+                        <button type="button" class="btn-qty plus" data-id="${escapeHTML(producto.id)}">+</button>
                     </div>
-                    <button class="btn-add-cart" data-id="${producto.id}">Agregar</button>
+                    <button class="btn-add-cart" data-id="${escapeHTML(producto.id)}">Agregar</button>
                 </div>
             </div>
         `;
@@ -199,7 +212,7 @@ function actualizarCarritoUI() {
         div.className = 'cart-item';
         div.innerHTML = `
             <div>
-                <strong>${item.nombre}</strong><br>
+                <strong>${escapeHTML(item.nombre)}</strong><br>
                 <small style="color: #64748b;">$${item.precio.toFixed(2)} x ${item.cantidad}</small>
             </div>
             <div style="display: flex; align-items: center; gap: 0.8rem;">
@@ -218,6 +231,16 @@ window.eliminarDelCarrito = function(index) {
     carrito.splice(index, 1);
     actualizarCarritoUI();
 };
+
+function escapeHTML(value) {
+    return String(value).replace(/[&<>"']/g, character => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+    })[character]);
+}
 
 function configurarEventos() {
     searchInput.addEventListener('input', filtrarYMostrarProductos);
