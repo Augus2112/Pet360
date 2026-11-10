@@ -3,10 +3,10 @@
   "version": "1.0.0",
   "private": true,
   "description": "Catalogo web de Pet360 con pedidos por WhatsApp",
-  "main": "server.js",
+  "main": "backend/server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node --watch server.js"
+    "start": "node backend/server.js",
+    "dev": "node --watch backend/server.js"
   },
   "dependencies": {
     "express": "^5.1.0"
