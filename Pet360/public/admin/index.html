@@ -3,10 +3,180 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Administración</title>
+  <meta name="theme-color" content="#ffffff">
+  <title>Acceso administrador | Pet360</title>
   <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
+  <main class="admin-page">
+    <section class="login-card" id="login-card" aria-labelledby="login-title">
+      <a class="brand" href="/" aria-label="Pet360, volver al catálogo">
+        <span class="brand-mark" aria-hidden="true">P</span>
+        <span>Pet<span class="brand-accent">360</span></span>
+      </a>
+
+      <div class="login-heading">
+        <p class="eyebrow">Panel de administración</p>
+        <h1 id="login-title">Qué bueno verte</h1>
+        <p class="login-description">Inicia sesión para administrar el catálogo de tu tienda.</p>
+      </div>
+
+      <form class="login-form" id="login-form">
+        <label for="username">Usuario</label>
+        <input
+          id="username"
+          name="username"
+          type="text"
+          placeholder="Ingresa tu usuario"
+          autocomplete="username"
+          required
+        >
+
+        <label for="password">Contraseña</label>
+        <input
+          id="password"
+          name="password"
+          type="password"
+          placeholder="Ingresa tu contraseña"
+          autocomplete="current-password"
+          required
+        >
+
+        <button type="submit">Iniciar sesión <span aria-hidden="true">→</span></button>
+        <p class="form-message" id="form-message" role="status" aria-live="polite"></p>
+      </form>
+
+      <p class="login-footer">Tu espacio para cuidar cada detalle de tu tienda.</p>
+    </section>
+    <aside class="admin-illustration" id="admin-illustration" aria-label="Administración sencilla para tu tienda de mascotas">
+      <div class="illustration-content">
+        <span class="illustration-icon" aria-hidden="true">🐾</span>
+        <p class="eyebrow">Todo en un solo lugar</p>
+        <h2>Tu catálogo, siempre listo para tus clientes.</h2>
+        <p>Organiza tus productos y categorías de manera fácil y rápida.</p>
+      </div>
+      <span class="decoration decoration-one" aria-hidden="true"></span>
+      <span class="decoration decoration-two" aria-hidden="true"></span>
+    </aside>
+
+    <section class="dashboard" id="dashboard" aria-labelledby="dashboard-title" hidden>
+      <header class="dashboard-header">
+        <div>
+          <a class="brand" href="/" aria-label="Pet360, volver al catálogo">
+            <span class="brand-mark" aria-hidden="true">P</span>
+            <span>Pet<span class="brand-accent">360</span></span>
+          </a>
+          <p class="eyebrow dashboard-eyebrow">Panel de administración</p>
+          <h1 id="dashboard-title">Tu catálogo</h1>
+          <p class="login-description">Administra las categorías y productos de tu tienda.</p>
+        </div>
+        <button class="logout-button" id="logout-button" type="button">Cerrar sesión</button>
+      </header>
+
+      <p class="dashboard-message" id="dashboard-message" role="status" aria-live="polite"></p>
+
+      <div class="dashboard-grid">
+        <section class="dashboard-card" aria-labelledby="category-title">
+          <div class="card-heading">
+            <p class="eyebrow">Organización</p>
+            <h2 id="category-title">Categorías</h2>
+            <p>Agrega las secciones para organizar tus productos.</p>
+          </div>
+          <form id="category-form" class="dashboard-form">
+            <label for="category-name">Nombre de la categoría</label>
+            <input id="category-name" name="nombre" type="text" maxlength="60" placeholder="Ej. Alimento para perros" required>
+            <button type="submit">Agregar categoría</button>
+          </form>
+          <ul class="category-list" id="category-list" aria-label="Categorías actuales"></ul>
+        </section>
+
+        <section class="dashboard-card" aria-labelledby="product-title">
+          <div class="card-heading">
+            <p class="eyebrow">Catálogo</p>
+            <h2 id="product-title">Agregar producto</h2>
+            <p>Completa la información y selecciona una imagen.</p>
+          </div>
+          <form id="product-form" class="dashboard-form">
+            <label for="product-name">Nombre del producto</label>
+            <input id="product-name" name="nombre" type="text" maxlength="100" placeholder="Ej. Alimento premium" required>
+
+            <label for="product-description">Descripción</label>
+            <textarea id="product-description" name="descripcion" maxlength="1000" rows="3" placeholder="Describe brevemente el producto"></textarea>
+
+            <div class="form-row">
+              <div>
+                <label for="product-price">Precio</label>
+                <input id="product-price" name="precio" type="number" min="0.01" max="10000000" step="0.01" placeholder="0.00" required>
+              </div>
+              <div>
+                <label for="product-category">Categoría</label>
+                <select id="product-category" name="categoriaId" required>
+                  <option value="">Selecciona una categoría</option>
+                </select>
+              </div>
+            </div>
+
+            <label for="product-image">Imagen (JPG, PNG o WebP; máximo 5 MB)</label>
+            <input id="product-image" name="imagen" type="file" accept="image/jpeg,image/png,image/webp" required>
+            <button type="submit">Guardar producto</button>
+          </form>
+        </section>
+
+        <section class="dashboard-card product-card" aria-labelledby="products-list-title">
+          <div class="card-heading">
+            <p class="eyebrow">Inventario visual</p>
+            <h2 id="products-list-title">Productos actuales</h2>
+          </div>
+          <ul class="product-list" id="product-list"></ul>
+          <p class="empty-state" id="empty-products">Todavía no hay productos en el catálogo.</p>
+        </section>
+      </div>
+
+      <dialog class="editor-dialog" id="edit-category-dialog" aria-labelledby="edit-category-title">
+        <form class="dashboard-form" id="edit-category-form">
+          <p class="eyebrow">Categoría</p>
+          <h2 id="edit-category-title">Editar categoría</h2>
+          <input id="edit-category-id" name="id" type="hidden">
+          <label for="edit-category-name">Nombre</label>
+          <input id="edit-category-name" name="nombre" type="text" maxlength="60" required>
+          <div class="dialog-actions">
+            <button class="secondary-button" type="button" data-close-dialog="edit-category-dialog">Cancelar</button>
+            <button type="submit">Guardar cambios</button>
+          </div>
+        </form>
+      </dialog>
+
+      <dialog class="editor-dialog" id="edit-product-dialog" aria-labelledby="edit-product-title">
+        <form class="dashboard-form" id="edit-product-form">
+          <p class="eyebrow">Producto</p>
+          <h2 id="edit-product-title">Editar producto</h2>
+          <input id="edit-product-id" name="id" type="hidden">
+          <label for="edit-product-name">Nombre del producto</label>
+          <input id="edit-product-name" name="nombre" type="text" maxlength="100" required>
+          <label for="edit-product-description">Descripción</label>
+          <textarea id="edit-product-description" name="descripcion" maxlength="1000" rows="3"></textarea>
+          <div class="form-row">
+            <div>
+              <label for="edit-product-price">Precio</label>
+              <input id="edit-product-price" name="precio" type="number" min="0.01" max="10000000" step="0.01" required>
+            </div>
+            <div>
+              <label for="edit-product-category">Categoría</label>
+              <select id="edit-product-category" name="categoriaId" required>
+                <option value="">Selecciona una categoría</option>
+              </select>
+            </div>
+          </div>
+          <label for="edit-product-image">Cambiar imagen (opcional, JPG, PNG o WebP; máximo 5 MB)</label>
+          <input id="edit-product-image" name="imagen" type="file" accept="image/jpeg,image/png,image/webp">
+          <div class="dialog-actions">
+            <button class="secondary-button" type="button" data-close-dialog="edit-product-dialog">Cancelar</button>
+            <button type="submit">Guardar cambios</button>
+          </div>
+        </form>
+      </dialog>
+    </section>
+  </main>
   <script src="js/admin.js"></script>
 </body>
 </html>
