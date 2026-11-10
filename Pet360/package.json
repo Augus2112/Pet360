@@ -4,6 +4,9 @@
   "private": true,
   "description": "Catalogo web de Pet360 con pedidos por WhatsApp",
   "main": "backend/server.js",
+  "engines": {
+    "node": ">=22.13.0"
+  },
   "scripts": {
     "start": "node backend/server.js",
     "dev": "node --watch backend/server.js"
