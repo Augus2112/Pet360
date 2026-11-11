@@ -281,7 +281,7 @@ function configurarEventos() {
                 return;
             }
 
-            const telefonoTienda = "584120000000";
+            const telefonoTienda = "584244225724";
 
             let mensaje = `*NUEVO PEDIDO - PET360*\n\n`;
             mensaje += `*Cliente:* ${nombre}\n\n`;
