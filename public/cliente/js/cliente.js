@@ -1,6 +1,6 @@
 // Configuración de JSONBin
 const BIN_ID = '6af3e690ffd5d16053b85a92';
-const API_KEY = '$2a$10$OnZ5OXF8hEQN4S6BEcNDTO2v3SzWKV1CDFQ1.yjYaYAOYB5kZWhd6'; // Reemplaza por tu Master Key de la pestaña API KEYS
+const API_KEY = '$2a$10$OnZ5OXF8hEQN4S6BEcNDTO2v3SzWKV1CDFQ1.yjYaYAOYB5kZWhd6';
 
 let productos = [];
 let carrito = [];
@@ -59,14 +59,15 @@ async function cargarProductos() {
     }
 }
 
+// Función encargada de crear automáticamente los botones según las categorías existentes
 function renderizarCategorias() {
     const categorias = ['todos', ...new Set(productos.map(p => p.categoria || 'Sin categoría'))];
     categoryFilters.innerHTML = '';
     
     categorias.forEach(cat => {
         const btn = document.createElement('button');
-        btn.className = `btn-filter ${cat === categoriaActual ? 'active' : ''}`;
-        btn.textContent = cat.charAt(0).toUpperCase() + cat.slice(1);
+        btn.className = `btn-filter ${cat.toLowerCase() === categoriaActual.toLowerCase() ? 'active' : ''}`;
+        btn.textContent = cat === 'todos' ? 'Todos' : (cat.charAt(0).toUpperCase() + cat.slice(1));
         btn.dataset.category = cat;
         btn.addEventListener('click', () => {
             categoriaActual = cat;
@@ -94,7 +95,7 @@ function filtrarYMostrarProductos() {
 function renderizarProductos(lista) {
     productsGrid.innerHTML = '';
     if (lista.length === 0) {
-        productsGrid.innerHTML = `<p style="grid-column: 1/-1; text-align: center; color: #64748b; padding: 2rem;">No hay productos disponibles.</p>`;
+        productsGrid.innerHTML = `<p style="grid-column: 1/-1; text-align: center; color: #64748b; padding: 2rem;">No hay productos disponibles en esta categoría.</p>`;
         return;
     }
 
@@ -243,7 +244,7 @@ window.eliminarDelCarrito = function(index) {
 function configurarEventos() {
     if (searchInput) searchInput.addEventListener('input', filtrarYMostrarProductos);
 
-    if (openCartBtn) openCartBtn.addEventListener('click', () => cartModal.classList.add('active'));
+    if (openCartBtn) openCartBtn.appendEventListener ? null : openCartBtn.addEventListener('click', () => cartModal.classList.add('active'));
     if (closeCartModal) closeCartModal.addEventListener('click', () => cartModal.classList.remove('active'));
 
     if (cartModal) {

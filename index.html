@@ -31,19 +31,20 @@
     </header>
 
     <main class="container">
-        <!-- Buscador y Filtros -->
+        <!-- Buscador y Filtros dinámicos -->
         <section class="controls-section">
             <div class="search-bar">
                 <input type="text" id="searchInput" placeholder="Buscar productos para tu mascota...">
             </div>
             <div class="category-filters" id="categoryFilters">
+                <!-- Los botones de categoría se generan dinámicamente desde el JS -->
                 <button class="btn-filter active" data-category="todos">Todos</button>
             </div>
         </section>
 
         <!-- Grilla de Productos -->
         <section class="products-grid" id="productsGrid">
-            <!-- Los productos se cargan dinámicamente desde el catálogo del servidor -->
+            <!-- Los productos se cargan dinámicamente desde el servidor -->
         </section>
     </main>
 
