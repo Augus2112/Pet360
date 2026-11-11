@@ -5,6 +5,7 @@ const API_KEY = '$2a$10$OnZ5OXF8hEQN4S6BEcNDTO2v3SzWKV1CDFQ1.yjYaYAOYB5kZWhd6';
 let productos = [];
 let carrito = [];
 let categoriaActual = 'todos';
+let listaCategoriasOficiales = ['todos'];
 let toastTimeout;
 
 // Elementos del DOM
@@ -49,7 +50,14 @@ async function cargarProductos() {
         if (!res.ok) throw new Error('Error al obtener datos');
 
         const data = await res.json();
+        
+        // Obtenemos los productos y las categorías guardadas en el JSONBin (tanto del admin como de los productos)
         productos = data.record.productos || [];
+        const categoriasAdmin = data.record.categorias || [];
+        const categoriasDesdeProductos = productos.map(p => p.categoria).filter(Boolean);
+        
+        // Unimos las listas de categorías sin duplicados para que aparezcan todas en los botones
+        listaCategoriasOficiales = ['todos', ...new Set([...categoriasAdmin.map(c => typeof c === 'object' ? c.nombre : c), ...categoriasDesdeProductos])];
         
         renderizarCategorias();
         filtrarYMostrarProductos();
@@ -59,12 +67,10 @@ async function cargarProductos() {
     }
 }
 
-// Función encargada de crear automáticamente los botones según las categorías existentes
 function renderizarCategorias() {
-    const categorias = ['todos', ...new Set(productos.map(p => p.categoria || 'Sin categoría'))];
     categoryFilters.innerHTML = '';
     
-    categorias.forEach(cat => {
+    listaCategoriasOficiales.forEach(cat => {
         const btn = document.createElement('button');
         btn.className = `btn-filter ${cat.toLowerCase() === categoriaActual.toLowerCase() ? 'active' : ''}`;
         btn.textContent = cat === 'todos' ? 'Todos' : (cat.charAt(0).toUpperCase() + cat.slice(1));
@@ -244,7 +250,7 @@ window.eliminarDelCarrito = function(index) {
 function configurarEventos() {
     if (searchInput) searchInput.addEventListener('input', filtrarYMostrarProductos);
 
-    if (openCartBtn) openCartBtn.appendEventListener ? null : openCartBtn.addEventListener('click', () => cartModal.classList.add('active'));
+    if (openCartBtn) openCartBtn.addEventListener('click', () => cartModal.classList.add('active'));
     if (closeCartModal) closeCartModal.addEventListener('click', () => cartModal.classList.remove('active'));
 
     if (cartModal) {
@@ -253,7 +259,7 @@ function configurarEventos() {
         });
     }
 
-    if (closeProductModal) closeProductModal.addEventListener('click', () => productModal.classList.remove('active'));
+    if (closeProductModal) closeProductModal.addEventListener('click', () => productModal.classList.add('active') ? null : productModal.classList.remove('active'));
 
     if (productModal) {
         productModal.addEventListener('click', (e) => {
