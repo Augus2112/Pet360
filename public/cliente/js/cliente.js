@@ -1,301 +1,115 @@
-// Configuración de JSONBin
-const BIN_ID = '6af3e690ffd5d16053b85a92';
-const API_KEY = '$2a$10$OnZ5OXF8hEQN4S6BEcNDTO2v3SzWKV1CDFQ1.yjYaYAOYB5kZWhd6'; // Reemplaza por tu Master Key de la pestaña API KEYS
+// URL de tu API de SheetDB (remplaza si tu ID de SheetDB cambia)
+const SHEETDB_URL = 'https://sheetdb.io/api/v1/41n1o2132w6nd';
 
 let productos = [];
-let carrito = [];
-let categoriaActual = 'todos';
-let toastTimeout;
+let categorias = [];
+let categoriaActual = 'todas';
 
 // Elementos del DOM
-const productsGrid = document.getElementById('productsGrid');
-const searchInput = document.getElementById('searchInput');
-const categoryFilters = document.getElementById('categoryFilters');
-const cartModal = document.getElementById('cartModal');
-const openCartBtn = document.getElementById('openCartBtn');
-const closeCartModal = document.getElementById('closeCartModal');
-const cartBadge = document.getElementById('cartBadge');
-const cartItemsList = document.getElementById('cartItemsList');
-const cartTotalText = document.getElementById('cartTotalText');
-const checkoutForm = document.getElementById('checkoutForm');
-const clientNameInput = document.getElementById('clientName');
-
-// Elementos de la Notificación Toast
-const toastNotification = document.getElementById('toastNotification');
-const toastMessage = document.getElementById('toastMessage');
-
-// Elementos del Modal de Producto
-const productModal = document.getElementById('productModal');
-const closeProductModal = document.getElementById('closeProductModal');
-const modalProductImg = document.getElementById('modalProductImg');
-const modalProductTitle = document.getElementById('modalProductTitle');
-const modalProductCategory = document.getElementById('modalProductCategory');
-const modalProductPrice = document.getElementById('modalProductPrice');
-const modalProductDesc = document.getElementById('modalProductDesc');
+const gridProductos = document.getElementById('gridProductos');
+const contenedorCategorias = document.getElementById('contenedorCategorias');
 
 document.addEventListener('DOMContentLoaded', () => {
-    cargarProductos();
-    configurarEventos();
+    cargarDatosDesdeGoogleSheets();
 });
 
-async function cargarProductos() {
+// Cargar Datos desde Google Sheets (SheetDB)
+async function cargarDatosDesdeGoogleSheets() {
     try {
-        productsGrid.innerHTML = `<p style="grid-column: 1/-1; text-align: center; color: #64748b; padding: 2rem;">Cargando productos...</p>`;
-        
-        const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
-            headers: { 'X-Master-Key': API_KEY }
-        });
+        // Cargar productos y categorías en paralelo desde sus respectivas pestañas
+        const [resProductos, resCategorias] = await Promise.all([
+            fetch(`${SHEETDB_URL}?sheet=productos`),
+            fetch(`${SHEETDB_URL}?sheet=categorias`)
+        ]);
 
-        if (!res.ok) throw new Error('Error al obtener datos');
+        if (!resProductos.ok || !resCategorias.ok) {
+            throw new Error('Error al conectar con la base de datos en Google Sheets');
+        }
 
-        const data = await res.json();
-        productos = data.record.productos || [];
-        
-        renderizarCategorias();
-        filtrarYMostrarProductos();
-    } catch (e) {
-        console.error(e);
-        productsGrid.innerHTML = `<p style="grid-column: 1/-1; text-align: center; color: #ef4444; padding: 2rem;">No se pudieron cargar los productos.</p>`;
+        productos = await resProductos.json();
+        categorias = await resCategorias.json();
+
+        renderizarFiltrosCategorias();
+        renderizarProductosCliente();
+    } catch (error) {
+        console.error("Error al cargar productos:", error);
+        if (gridProductos) {
+            gridProductos.innerHTML = `<p style="grid-column: 1/-1; text-align: center; color: #64748b;">Error al cargar el catálogo de productos.</p>`;
+        }
     }
 }
 
-function renderizarCategorias() {
-    const categorias = ['todos', ...new Set(productos.map(p => p.categoria || 'Sin categoría'))];
-    categoryFilters.innerHTML = '';
-    
+function renderizarFiltrosCategorias() {
+    if (!contenedorCategorias) return;
+    contenedorCategorias.innerHTML = '';
+
+    // Botón para 'Todas'
+    const btnTodas = document.createElement('button');
+    btnTodas.className = `filter-btn ${categoriaActual === 'todas' ? 'active' : ''}`;
+    btnTodas.textContent = 'Todas';
+    btnTodas.addEventListener('click', () => filtrarPorCategoria('todas', btnTodas));
+    contenedorCategorias.appendChild(btnTodas);
+
     categorias.forEach(cat => {
+        const nombreCat = typeof cat === 'object' ? cat.nombre : cat;
+        if (!nombreCat) return;
+
         const btn = document.createElement('button');
-        btn.className = `btn-filter ${cat === categoriaActual ? 'active' : ''}`;
-        btn.textContent = cat.charAt(0).toUpperCase() + cat.slice(1);
-        btn.dataset.category = cat;
-        btn.addEventListener('click', () => {
-            categoriaActual = cat;
-            document.querySelectorAll('.btn-filter').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            filtrarYMostrarProductos();
-        });
-        categoryFilters.appendChild(btn);
+        btn.className = `filter-btn ${categoriaActual === nombreCat ? 'active' : ''}`;
+        btn.textContent = nombreCat;
+        btn.addEventListener('click', () => filtrarPorCategoria(nombreCat, btn));
+        contenedorCategorias.appendChild(btn);
     });
 }
 
-function filtrarYMostrarProductos() {
-    const textoBusqueda = searchInput ? searchInput.value.toLowerCase().trim() : '';
+function filtrarPorCategoria(categoria, botonElemento) {
+    categoriaActual = categoria;
     
-    const filtrados = productos.filter(p => {
-        const catProducto = p.categoria || 'Sin categoría';
-        const coincideCategoria = categoriaActual === 'todos' || catProducto.toLowerCase() === categoriaActual.toLowerCase();
-        const coincideTexto = p.nombre.toLowerCase().includes(textoBusqueda);
-        return coincideCategoria && coincideTexto;
-    });
+    // Actualizar clase activa en los botones
+    document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+    if (botonElemento) botonElemento.classList.add('active');
 
-    renderizarProductos(filtrados);
+    renderizarProductosCliente();
 }
 
-function renderizarProductos(lista) {
-    productsGrid.innerHTML = '';
-    if (lista.length === 0) {
-        productsGrid.innerHTML = `<p style="grid-column: 1/-1; text-align: center; color: #64748b; padding: 2rem;">No hay productos disponibles.</p>`;
+function renderizarProductosCliente() {
+    if (!gridProductos) return;
+    gridProductos.innerHTML = '';
+
+    const productosFiltrados = categoriaActual === 'todas'
+        ? productos
+        : productos.filter(p => p.categoria === categoriaActual);
+
+    if (productosFiltrados.length === 0) {
+        gridProductos.innerHTML = `<p style="grid-column: 1/-1; text-align: center; color: #64748b; padding: 2rem;">No se encontraron productos en esta categoría.</p>`;
         return;
     }
 
-    lista.forEach(producto => {
-        const card = document.createElement('div');
+    productosFiltrados.forEach(p => {
+        const card = document.createElement('article');
         card.className = 'product-card';
         card.innerHTML = `
-            <div class="product-img-container" data-id="${producto.id}">
-                <img src="${producto.imagen || 'https://via.placeholder.com/240x170'}" alt="${producto.nombre}" class="product-img">
+            <div class="product-image-container">
+                <img src="${p.imagen || 'https://via.placeholder.com/300x200?text=Pet360'}" alt="${p.nombre}" loading="lazy">
             </div>
             <div class="product-info">
-                <h3 class="product-title" data-id="${producto.id}">${producto.nombre}</h3>
-                <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 0.4rem;">Categoría: ${producto.categoria || 'Sin categoría'}</p>
-                <div class="product-price">$${Number(producto.precio).toFixed(2)}</div>
-                
-                <div class="product-actions-card">
-                    <div class="qty-selector">
-                        <button type="button" class="btn-qty minus" data-id="${producto.id}">-</button>
-                        <input type="number" id="qty-${producto.id}" class="input-qty" value="1" min="1" max="99">
-                        <button type="button" class="btn-qty plus" data-id="${producto.id}">+</button>
-                    </div>
-                    <button class="btn-add-cart" data-id="${producto.id}">Agregar</button>
+                <span class="product-category">${p.categoria || 'General'}</span>
+                <h3 class="product-title">${p.nombre}</h3>
+                <p class="product-description">${p.descripcion || ''}</p>
+                <div class="product-footer">
+                    <span class="product-price">$${Number(p.precio).toFixed(2)}</span>
+                    <button class="whatsapp-btn" onclick="solicitarPorWhatsApp('${p.nombre}', ${p.precio})">
+                        Pedir por WhatsApp
+                    </button>
                 </div>
             </div>
         `;
-        productsGrid.appendChild(card);
-    });
-
-    productsGrid.querySelectorAll('.product-img-container, .product-title').forEach(el => {
-        el.addEventListener('click', (e) => {
-            const id = e.currentTarget.dataset.id;
-            abrirDetalleProducto(id);
-        });
-    });
-
-    productsGrid.querySelectorAll('.btn-qty').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const id = e.target.dataset.id;
-            const input = document.getElementById(`qty-${id}`);
-            let val = parseInt(input.value) || 1;
-            if (e.target.classList.contains('plus')) {
-                val++;
-            } else if (e.target.classList.contains('minus') && val > 1) {
-                val--;
-            }
-            input.value = val;
-        });
-    });
-
-    productsGrid.querySelectorAll('.btn-add-cart').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const id = e.target.dataset.id;
-            const input = document.getElementById(`qty-${id}`);
-            const cantidad = parseInt(input.value) || 1;
-            agregarAlCarrito(id, cantidad);
-        });
+        gridProductos.appendChild(card);
     });
 }
 
-function abrirDetalleProducto(id) {
-    const producto = productos.find(p => p.id == id);
-    if (!producto) return;
-
-    modalProductImg.src = producto.imagen || 'https://via.placeholder.com/400x300';
-    modalProductImg.alt = producto.nombre;
-    modalProductTitle.textContent = producto.nombre;
-    modalProductCategory.textContent = `Categoría: ${producto.categoria || 'Sin categoría'}`;
-    modalProductPrice.textContent = `$${Number(producto.precio).toFixed(2)}`;
-    modalProductDesc.textContent = producto.descripcion || "Este producto no cuenta con una descripción detallada.";
-
-    productModal.classList.add('active');
-}
-
-function agregarAlCarrito(id, cantidad) {
-    const productoEncontrado = productos.find(p => p.id == id);
-    if (!productoEncontrado) return;
-
-    const index = carrito.findIndex(item => item.id == id);
-    if (index > -1) {
-        carrito[index].cantidad += cantidad;
-    } else {
-        carrito.push({
-            id: productoEncontrado.id,
-            nombre: productoEncontrado.nombre,
-            precio: Number(productoEncontrado.precio),
-            cantidad: cantidad
-        });
-    }
-
-    actualizarCarritoUI();
-    mostrarNotificacion(`${cantidad}x "${productoEncontrado.nombre}" agregado(s)`);
-
-    const input = document.getElementById(`qty-${id}`);
-    if (input) input.value = 1;
-}
-
-function mostrarNotificacion(mensaje) {
-    if (!toastNotification || !toastMessage) return;
-    if (toastTimeout) clearTimeout(toastTimeout);
-    
-    toastMessage.textContent = mensaje;
-    toastNotification.classList.add('active');
-
-    toastTimeout = setTimeout(() => {
-        toastNotification.classList.remove('active');
-    }, 2500);
-}
-
-function actualizarCarritoUI() {
-    const totalItems = carrito.reduce((sum, item) => sum + item.cantidad, 0);
-    if (cartBadge) cartBadge.textContent = totalItems;
-
-    if (!cartItemsList) return;
-    cartItemsList.innerHTML = '';
-    if (carrito.length === 0) {
-        cartItemsList.innerHTML = `<p style="text-align: center; color: #64748b; padding: 1rem;">Tu carrito está vacío.</p>`;
-        if (cartTotalText) cartTotalText.textContent = `Total: $0.00`;
-        return;
-    }
-
-    carrito.forEach((item, index) => {
-        const div = document.createElement('div');
-        div.className = 'cart-item';
-        div.innerHTML = `
-            <div>
-                <strong>${item.nombre}</strong><br>
-                <small style="color: #64748b;">$${item.precio.toFixed(2)} x ${item.cantidad}</small>
-            </div>
-            <div style="display: flex; align-items: center; gap: 0.8rem;">
-                <strong>$${(item.precio * item.cantidad).toFixed(2)}</strong>
-                <button type="button" onclick="eliminarDelCarrito(${index})" style="background:none; border:none; color:#ef4444; font-weight:bold; cursor:pointer; font-size:1.2rem;">&times;</button>
-            </div>
-        `;
-        cartItemsList.appendChild(div);
-    });
-
-    const total = carrito.reduce((sum, item) => sum + (item.precio * item.cantidad), 0);
-    if (cartTotalText) cartTotalText.textContent = `Total: $${total.toFixed(2)}`;
-}
-
-window.eliminarDelCarrito = function(index) {
-    carrito.splice(index, 1);
-    actualizarCarritoUI();
+window.solicitarPorWhatsApp = function(nombre, precio) {
+    const telefono = "584120000000"; // Reemplazar por tu número real de WhatsApp
+    const mensaje = encodeURIComponent(`¡Hola! Me interesa comprar el producto: *${nombre}* por un precio de *$${Number(precio).toFixed(2)}*. ¿Tienen disponibilidad?`);
+    window.open(`https://wa.me/${telefono}?text=${mensaje}`, '_blank');
 };
-
-function configurarEventos() {
-    if (searchInput) searchInput.addEventListener('input', filtrarYMostrarProductos);
-
-    if (openCartBtn) openCartBtn.addEventListener('click', () => cartModal.classList.add('active'));
-    if (closeCartModal) closeCartModal.addEventListener('click', () => cartModal.classList.remove('active'));
-
-    if (cartModal) {
-        cartModal.addEventListener('click', (e) => {
-            if (e.target === cartModal) cartModal.classList.remove('active');
-        });
-    }
-
-    if (closeProductModal) closeProductModal.addEventListener('click', () => productModal.classList.remove('active'));
-
-    if (productModal) {
-        productModal.addEventListener('click', (e) => {
-            if (e.target === productModal) productModal.classList.remove('active');
-        });
-    }
-
-    if (clientNameInput) {
-        clientNameInput.addEventListener('input', (e) => {
-            e.target.value = e.target.value.replace(/[0-9]/g, '');
-        });
-    }
-
-    if (checkoutForm) {
-        checkoutForm.addEventListener('submit', (e) => {
-            e.preventDefault();
-            if (carrito.length === 0) {
-                alert("El carrito está vacío.");
-                return;
-            }
-
-            const nombre = clientNameInput ? clientNameInput.value.trim() : '';
-            const soloLetrasRegex = /^[A-Za-zÁÉÍÓÚáéíóúÑñ\s]+$/;
-            if (!soloLetrasRegex.test(nombre)) {
-                alert("Por favor, ingresa un nombre válido que contenga solo letras.");
-                return;
-            }
-
-            const telefonoTienda = "584244225724";
-
-            let mensaje = `*NUEVO PEDIDO - PET360*\n\n`;
-            mensaje += `*Cliente:* ${nombre}\n\n`;
-            mensaje += `*Productos:* \n`;
-
-            carrito.forEach(item => {
-                mensaje += `- ${item.cantidad}x ${item.nombre} ($${(item.precio * item.cantidad).toFixed(2)})\n`;
-            });
-
-            const total = carrito.reduce((sum, item) => sum + (item.precio * item.cantidad), 0);
-            mensaje += `\n*Total a pagar: $${total.toFixed(2)}*`;
-
-            const url = `https://wa.me/${telefonoTienda}?text=${encodeURIComponent(mensaje)}`;
-            window.open(url, '_blank');
-        });
-    }
-}
