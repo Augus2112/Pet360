@@ -1,11 +1,10 @@
-// Configuración de JSONBin
-const BIN_ID = '6af3e690ffd5d16053b85a92';
-const API_KEY = '$2a$10$OnZ5OXF8hEQN4S6BEcNDTO2v3SzWKV1CDFQ1.yjYaYAOYB5kZWhd6'; // Reemplaza por tu Master Key de la pestaña API KEYS
-
 let productos = [];
+let categorias = [];
 let carrito = [];
 let categoriaActual = 'todos';
 let toastTimeout;
+let catalogoCargado = false;
+let cargaEnCurso = false;
 
 // Elementos del DOM
 const productsGrid = document.getElementById('productsGrid');
@@ -38,38 +37,65 @@ document.addEventListener('DOMContentLoaded', () => {
     configurarEventos();
 });
 
-async function cargarProductos() {
+document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) cargarProductos({ silencioso: true });
+});
+
+setInterval(() => {
+    if (!document.hidden) cargarProductos({ silencioso: true });
+}, 30000);
+
+async function cargarProductos({ silencioso = false } = {}) {
+    if (cargaEnCurso) return;
+    cargaEnCurso = true;
+
+    if (!silencioso) {
+        productsGrid.innerHTML = '<p style="grid-column: 1/-1; text-align: center; color: #64748b; padding: 2rem;">Cargando catálogo...</p>';
+    }
+
     try {
-        productsGrid.innerHTML = `<p style="grid-column: 1/-1; text-align: center; color: #64748b; padding: 2rem;">Cargando productos...</p>`;
-        
-        const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
-            headers: { 'X-Master-Key': API_KEY }
-        });
+        const response = await fetch('/api/catalogo', { cache: 'no-store' });
+        if (!response.ok) throw new Error('No se pudo cargar el catálogo.');
 
-        if (!res.ok) throw new Error('Error al obtener datos');
+        const catalogo = await response.json();
+        if (!Array.isArray(catalogo.categorias) || !Array.isArray(catalogo.productos)) {
+            throw new Error('El catálogo tiene un formato no válido.');
+        }
 
-        const data = await res.json();
-        productos = data.record.productos || [];
-        
+        categorias = catalogo.categorias;
+        if (categoriaActual !== 'todos' && !categorias.some(categoria => String(categoria.id) === categoriaActual)) {
+            categoriaActual = 'todos';
+        }
+        const nombresCategorias = new Map(categorias.map(categoria => [categoria.id, categoria.nombre]));
+        productos = catalogo.productos.map(producto => ({
+            ...producto,
+            categoria: nombresCategorias.get(producto.categoriaId) || 'Sin categoría'
+        }));
+
+        catalogoCargado = true;
         renderizarCategorias();
         filtrarYMostrarProductos();
-    } catch (e) {
-        console.error(e);
-        productsGrid.innerHTML = `<p style="grid-column: 1/-1; text-align: center; color: #ef4444; padding: 2rem;">No se pudieron cargar los productos.</p>`;
+    } catch (error) {
+        if (silencioso && catalogoCargado) return;
+        productsGrid.innerHTML = `<p style="grid-column: 1/-1; text-align: center; color: #ef4444; padding: 2rem;">${escapeHTML(error.message || 'No se pudo conectar con el catálogo.')}</p>`;
+    } finally {
+        cargaEnCurso = false;
     }
 }
 
 function renderizarCategorias() {
-    const categorias = ['todos', ...new Set(productos.map(p => p.categoria || 'Sin categoría'))];
     categoryFilters.innerHTML = '';
-    
-    categorias.forEach(cat => {
+
+    [
+        { id: 'todos', nombre: 'Todos' },
+        ...categorias.map(categoria => ({ id: String(categoria.id), nombre: categoria.nombre }))
+    ].forEach(cat => {
         const btn = document.createElement('button');
-        btn.className = `btn-filter ${cat === categoriaActual ? 'active' : ''}`;
-        btn.textContent = cat.charAt(0).toUpperCase() + cat.slice(1);
-        btn.dataset.category = cat;
+        btn.className = `btn-filter ${cat.id === categoriaActual ? 'active' : ''}`;
+        btn.textContent = cat.nombre;
+        btn.dataset.category = cat.id;
         btn.addEventListener('click', () => {
-            categoriaActual = cat;
+            categoriaActual = cat.id;
             document.querySelectorAll('.btn-filter').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             filtrarYMostrarProductos();
@@ -82,8 +108,7 @@ function filtrarYMostrarProductos() {
     const textoBusqueda = searchInput ? searchInput.value.toLowerCase().trim() : '';
     
     const filtrados = productos.filter(p => {
-        const catProducto = p.categoria || 'Sin categoría';
-        const coincideCategoria = categoriaActual === 'todos' || catProducto.toLowerCase() === categoriaActual.toLowerCase();
+        const coincideCategoria = categoriaActual === 'todos' || String(p.categoriaId) === categoriaActual;
         const coincideTexto = p.nombre.toLowerCase().includes(textoBusqueda);
         return coincideCategoria && coincideTexto;
     });
@@ -102,21 +127,21 @@ function renderizarProductos(lista) {
         const card = document.createElement('div');
         card.className = 'product-card';
         card.innerHTML = `
-            <div class="product-img-container" data-id="${producto.id}">
-                <img src="${producto.imagen || 'https://via.placeholder.com/240x170'}" alt="${producto.nombre}" class="product-img">
+            <div class="product-img-container" data-id="${escapeHTML(producto.id)}">
+                <img src="${escapeHTML(producto.imagen || 'https://via.placeholder.com/240x170')}" alt="${escapeHTML(producto.nombre)}" class="product-img">
             </div>
             <div class="product-info">
-                <h3 class="product-title" data-id="${producto.id}">${producto.nombre}</h3>
-                <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 0.4rem;">Categoría: ${producto.categoria || 'Sin categoría'}</p>
+                <h3 class="product-title" data-id="${escapeHTML(producto.id)}">${escapeHTML(producto.nombre)}</h3>
+                <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 0.4rem;">Categoría: ${escapeHTML(producto.categoria)}</p>
                 <div class="product-price">$${Number(producto.precio).toFixed(2)}</div>
                 
                 <div class="product-actions-card">
                     <div class="qty-selector">
-                        <button type="button" class="btn-qty minus" data-id="${producto.id}">-</button>
-                        <input type="number" id="qty-${producto.id}" class="input-qty" value="1" min="1" max="99">
-                        <button type="button" class="btn-qty plus" data-id="${producto.id}">+</button>
+                        <button type="button" class="btn-qty minus" data-id="${escapeHTML(producto.id)}">-</button>
+                        <input type="number" id="qty-${escapeHTML(producto.id)}" class="input-qty" value="1" min="1" max="99">
+                        <button type="button" class="btn-qty plus" data-id="${escapeHTML(producto.id)}">+</button>
                     </div>
-                    <button class="btn-add-cart" data-id="${producto.id}">Agregar</button>
+                    <button class="btn-add-cart" data-id="${escapeHTML(producto.id)}">Agregar</button>
                 </div>
             </div>
         `;
@@ -220,7 +245,7 @@ function actualizarCarritoUI() {
         div.className = 'cart-item';
         div.innerHTML = `
             <div>
-                <strong>${item.nombre}</strong><br>
+                    <strong>${escapeHTML(item.nombre)}</strong><br>
                 <small style="color: #64748b;">$${item.precio.toFixed(2)} x ${item.cantidad}</small>
             </div>
             <div style="display: flex; align-items: center; gap: 0.8rem;">
@@ -239,6 +264,16 @@ window.eliminarDelCarrito = function(index) {
     carrito.splice(index, 1);
     actualizarCarritoUI();
 };
+
+function escapeHTML(value) {
+    return String(value).replace(/[&<>"']/g, character => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+    })[character]);
+}
 
 function configurarEventos() {
     if (searchInput) searchInput.addEventListener('input', filtrarYMostrarProductos);
