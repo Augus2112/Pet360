@@ -373,15 +373,12 @@ app.post('/api/admin/login', (req, res, next) => {
   const credentials = credentialsDatabase.prepare(
     'SELECT username, password_salt, password_hash FROM admin_credentials WHERE id = ?',
   ).get(1);
-  const usernameMatches = adminUsername && adminPassword
-    ? safeEqual(username, adminUsername)
-    : credentials && safeEqual(username, credentials.username);
-  const passwordHash = credentials && !(adminUsername && adminPassword)
+  const usernameMatches = credentials && safeEqual(username, credentials.username);
+  const passwordHash = credentials
     ? scryptSync(password, credentials.password_salt, credentials.password_hash.length)
-    : null;
-  const passwordMatches = adminUsername && adminPassword
-    ? safeEqual(password, adminPassword)
-    : credentials && timingSafeEqual(passwordHash, Buffer.from(credentials.password_hash));
+    : Buffer.alloc(64);
+  const storedPasswordHash = credentials ? Buffer.from(credentials.password_hash) : Buffer.alloc(64);
+  const passwordMatches = timingSafeEqual(passwordHash, storedPasswordHash);
 
   if (!usernameMatches || !passwordMatches) {
     return res.status(401).json({ error: 'Usuario o contraseña incorrectos.' });
@@ -570,19 +567,21 @@ function initializeAdminCredentials() {
     'SELECT id FROM admin_credentials WHERE id = ?',
   ).get(1);
 
-  if (existingAdmin || !adminUsername || !adminPassword) {
-    if (!existingAdmin) {
-      throw new Error(
-        'Configura ADMIN_USER y ADMIN_PASS en .env o inicializa las credenciales del administrador.',
-      );
-    }
-
+  if (existingAdmin) {
     return;
   }
 
+  const username = process.env.ADMIN_USER;
+  const password = process.env.ADMIN_PASS;
+  if (!username || !password) {
+    throw new Error(
+      'No hay credenciales de administrador en SQL. Configura ADMIN_USER y ADMIN_PASS en .env para inicializar la base de datos.',
+    );
+  }
+
   const salt = randomBytes(16);
-  const passwordHash = scryptSync(adminPassword, salt, 64);
+  const passwordHash = scryptSync(password, salt, 64);
   credentialsDatabase.prepare(
     'INSERT INTO admin_credentials (id, username, password_salt, password_hash) VALUES (?, ?, ?, ?)',
-  ).run(1, adminUsername, salt, passwordHash);
+  ).run(1, username, salt, passwordHash);
 }
