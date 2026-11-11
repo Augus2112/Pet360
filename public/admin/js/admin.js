@@ -4,380 +4,305 @@ const ADMIN_PASS = "admin123";
 
 // Configuración de JSONBin
 const BIN_ID = '6af3e690ffd5d16053b85a92';
-const API_KEY = '$2a$10$OnZ5OXF8hEQN4S6BEcNDTO2v3SzWKV1CDFQ1.yjYaYAOYB5kZWhd6'; // Reemplaza por tu Master Key de la pestaña API KEYS
+const API_KEY = '$2a$10$OnZ5OXF8hEQN4S6BEcNDTO2v3SzWKV1CDFQ1.yjYaYAOYB5kZWhd6';
 
+let productos = [];
+let categorias = [];
+
+// Elementos del DOM
+const loginCard = document.getElementById('login-card');
 const adminPage = document.querySelector('.admin-page');
-const loginCard = document.querySelector('#login-card');
-const adminIllustration = document.querySelector('#admin-illustration');
-const loginForm = document.querySelector('#login-form');
-const formMessage = document.querySelector('#form-message');
-const loginButton = loginForm.querySelector('button[type="submit"]');
-const dashboard = document.querySelector('#dashboard');
-const dashboardMessage = document.querySelector('#dashboard-message');
-const logoutButton = document.querySelector('#logout-button');
-const categoryForm = document.querySelector('#category-form');
-const categoryInput = document.querySelector('#category-name');
-const categoryList = document.querySelector('#category-list');
-const editCategoryDialog = document.querySelector('#edit-category-dialog');
-const editCategoryForm = document.querySelector('#edit-category-form');
-const editCategoryId = document.querySelector('#edit-category-id');
-const editCategoryName = document.querySelector('#edit-category-name');
-const productForm = document.querySelector('#product-form');
-const productCategory = document.querySelector('#product-category');
-const productList = document.querySelector('#product-list');
-const emptyProducts = document.querySelector('#empty-products');
-const editProductDialog = document.querySelector('#edit-product-dialog');
-const editProductForm = document.querySelector('#edit-product-form');
-const editProductCategory = document.querySelector('#edit-product-category');
-const categoryPlaceholder = productCategory.querySelector('option').cloneNode(true);
-const editCategoryPlaceholder = editProductCategory.querySelector('option').cloneNode(true);
+const loginForm = document.getElementById('login-form');
+const loginError = document.getElementById('login-error');
 
-let currentCatalog = { categorias: [], productos: [] };
+const formProducto = document.getElementById('formProducto');
+const formCategoria = document.getElementById('formCategoria');
+const listaProductosAdmin = document.getElementById('listaProductosAdmin');
+const listaCategoriasAdmin = document.getElementById('listaCategoriasAdmin');
+const selectCategoriaProducto = document.getElementById('categoriaProducto');
 
 document.addEventListener('DOMContentLoaded', () => {
-  verificarSesion();
-});
-
-function verificarSesion() {
-  const sesionActiva = sessionStorage.getItem('admin_logged_in');
-  if (sesionActiva === 'true') {
-    showDashboard();
-    loadCatalog();
-  } else {
-    showLogin();
-  }
-}
-
-function showDashboard() {
-  adminPage.classList.add('dashboard-active');
-  loginCard.hidden = true;
-  adminIllustration.hidden = true;
-  dashboard.hidden = false;
-}
-
-function showLogin() {
-  adminPage.classList.remove('dashboard-active');
-  loginCard.hidden = false;
-  adminIllustration.hidden = false;
-  dashboard.hidden = true;
-}
-
-// Cargar catálogo desde JSONBin
-async function loadCatalog() {
-  dashboardMessage.textContent = 'Cargando catálogo desde la nube...';
-  try {
-    const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
-      headers: { 'X-Master-Key': API_KEY }
-    });
-    
-    if (!res.ok) throw new Error('Error al conectar con la base de datos');
-
-    const data = await res.json();
-    currentCatalog.productos = data.record.productos || [];
-    currentCatalog.categorias = data.record.categorias || [
-      { id: 1, nombre: 'Alimento' },
-      { id: 2, nombre: 'Accesorios' },
-      { id: 3, nombre: 'Gatos' }
-    ];
-
-    renderCategories(currentCatalog.categorias);
-    renderProducts(currentCatalog.productos);
-    dashboardMessage.textContent = 'Catálogo actualizado en tiempo real.';
-  } catch (e) {
-    dashboardMessage.textContent = 'Error al cargar catálogo desde la nube.';
-  }
-}
-
-// Guardar todo el objeto en JSONBin
-async function guardarEnNube() {
-  dashboardMessage.textContent = 'Guardando cambios en la nube...';
-  try {
-    const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Master-Key': API_KEY
-      },
-      body: JSON.stringify(currentCatalog)
-    });
-
-    if (!res.ok) throw new Error('Error al guardar');
-    dashboardMessage.textContent = '¡Cambios guardados con éxito en la nube!';
-  } catch (e) {
-    dashboardMessage.textContent = 'Error al guardar cambios en la nube.';
-  }
-}
-
-function renderCategories(categories) {
-  categoryList.replaceChildren();
-  productCategory.replaceChildren(categoryPlaceholder.cloneNode(true));
-  editProductCategory.replaceChildren(editCategoryPlaceholder.cloneNode(true));
-
-  for (const category of categories) {
-    const item = document.createElement('li');
-    item.className = 'category-item';
-
-    const name = document.createElement('span');
-    name.textContent = category.nombre;
-
-    const id = document.createElement('span');
-    id.textContent = `#${category.id}`;
-
-    const actions = document.createElement('div');
-    actions.className = 'category-actions';
-
-    const editButton = document.createElement('button');
-    editButton.type = 'button';
-    editButton.dataset.action = 'edit-category';
-    editButton.dataset.id = String(category.id);
-    editButton.textContent = 'Editar';
-
-    const deleteButton = document.createElement('button');
-    deleteButton.type = 'button';
-    deleteButton.dataset.action = 'delete-category';
-    deleteButton.dataset.id = String(category.id);
-    deleteButton.textContent = 'Eliminar';
-
-    actions.append(editButton, deleteButton);
-    item.append(name, id, actions);
-    categoryList.append(item);
-
-    const option = document.createElement('option');
-    option.value = category.nombre;
-    option.textContent = category.nombre;
-    productCategory.append(option.cloneNode(true));
-    editProductCategory.append(option);
-  }
-}
-
-function renderProducts(products) {
-  productList.replaceChildren();
-  emptyProducts.hidden = products.length > 0;
-
-  for (const product of products) {
-    const item = document.createElement('li');
-    item.className = 'product-item';
-
-    const image = document.createElement('img');
-    image.src = product.imagen || 'https://via.placeholder.com/240x170';
-    image.alt = product.nombre;
-    image.loading = 'lazy';
-
-    const info = document.createElement('div');
-    info.className = 'product-info';
-
-    const name = document.createElement('h3');
-    name.textContent = product.nombre;
-
-    const categoryName = document.createElement('p');
-    categoryName.textContent = product.categoria ? `Categoría: ${product.categoria}` : 'Sin categoría';
-
-    const price = document.createElement('p');
-    price.className = 'product-price';
-    price.textContent = `$${Number(product.precio).toFixed(2)}`;
-
-    const actions = document.createElement('div');
-    actions.className = 'product-actions';
-
-    const editButton = document.createElement('button');
-    editButton.type = 'button';
-    editButton.dataset.action = 'edit-product';
-    editButton.dataset.id = String(product.id);
-    editButton.textContent = 'Editar';
-
-    const deleteButton = document.createElement('button');
-    deleteButton.type = 'button';
-    deleteButton.dataset.action = 'delete-product';
-    deleteButton.dataset.id = String(product.id);
-    deleteButton.textContent = 'Eliminar';
-
-    actions.append(editButton, deleteButton);
-    info.append(name, categoryName, price, actions);
-    item.append(image, info);
-    productList.append(item);
-  }
-}
-
-loginForm.addEventListener('submit', (event) => {
-  event.preventDefault();
-  formMessage.textContent = '';
-
-  const formData = new FormData(loginForm);
-  const user = formData.get('username');
-  const pass = formData.get('password');
-
-  if (user === ADMIN_USER && pass === ADMIN_PASS) {
-    sessionStorage.setItem('admin_logged_in', 'true');
-    loginForm.reset();
-    showDashboard();
-    loadCatalog();
-  } else {
-    formMessage.textContent = 'Usuario o contraseña incorrectos.';
-  }
-});
-
-categoryForm.addEventListener('submit', async (event) => {
-  event.preventDefault();
-  const nombreCat = categoryInput.value.trim();
-  if (!nombreCat) return;
-
-  const nuevaCat = { id: Date.now(), nombre: nombreCat };
-  currentCatalog.categorias.push(nuevaCat);
-
-  categoryForm.reset();
-  renderCategories(currentCatalog.categorias);
-  await guardarEnNube();
-});
-
-categoryList.addEventListener('click', async (event) => {
-  const button = event.target.closest('button[data-action]');
-  if (!button) return;
-
-  const catId = Number(button.dataset.id);
-  const category = currentCatalog.categorias.find((item) => item.id === catId);
-  if (!category) return;
-
-  if (button.dataset.action === 'edit-category') {
-    editCategoryId.value = String(category.id);
-    editCategoryName.value = category.nombre;
-    editCategoryDialog.showModal();
-    return;
-  }
-
-  if (!window.confirm(`¿Eliminar la categoría "${category.nombre}"?`)) return;
-
-  currentCatalog.categorias = currentCatalog.categorias.filter(c => c.id !== catId);
-  renderCategories(currentCatalog.categorias);
-  await guardarEnNube();
-});
-
-editCategoryForm.addEventListener('submit', async (event) => {
-  event.preventDefault();
-  const catId = Number(editCategoryId.value);
-  const nuevoNombre = editCategoryName.value.trim();
-
-  const cat = currentCatalog.categorias.find(c => c.id === catId);
-  if (cat) {
-    cat.nombre = nuevoNombre;
-    editCategoryDialog.close();
-    renderCategories(currentCatalog.categorias);
-    await guardarEnNube();
-  }
-});
-
-function convertirImagenABase64(file) {
-  return new Promise((resolve, reject) => {
-    if (!file) {
-      resolve('https://via.placeholder.com/240x170');
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = error => reject(error);
-    reader.readAsDataURL(file);
-  });
-}
-
-productForm.addEventListener('submit', async (event) => {
-  event.preventDefault();
-  const submitButton = productForm.querySelector('button[type="submit"]');
-  submitButton.disabled = true;
-
-  const nombre = document.getElementById('product-name').value;
-  const descripcion = document.getElementById('product-description').value;
-  const precio = parseFloat(document.getElementById('product-price').value);
-  const categoria = productCategory.value;
-  const imageFile = document.getElementById('product-image').files[0];
-
-  try {
-    const imagenBase64 = await convertirImagenABase64(imageFile);
-
-    const nuevoProducto = {
-      id: Date.now(),
-      nombre,
-      descripcion,
-      precio,
-      categoria,
-      imagen: imagenBase64
-    };
-
-    currentCatalog.productos.push(nuevoProducto);
-    productForm.reset();
-    renderProducts(currentCatalog.productos);
-    await guardarEnNube();
-  } catch (error) {
-    dashboardMessage.textContent = 'Error al procesar la imagen.';
-  } finally {
-    submitButton.disabled = false;
-  }
-});
-
-productList.addEventListener('click', async (event) => {
-  const button = event.target.closest('button[data-action]');
-  if (!button) return;
-
-  const prodId = Number(button.dataset.id);
-  const product = currentCatalog.productos.find((item) => item.id === prodId);
-  if (!product) return;
-
-  if (button.dataset.action === 'edit-product') {
-    document.querySelector('#edit-product-id').value = String(product.id);
-    document.querySelector('#edit-product-name').value = product.nombre;
-    document.querySelector('#edit-product-description').value = product.descripcion || '';
-    document.querySelector('#edit-product-price').value = String(product.precio);
-    editProductCategory.value = product.categoria;
-    document.querySelector('#edit-product-image').value = '';
-    editProductDialog.showModal();
-    return;
-  }
-
-  if (!window.confirm(`¿Eliminar el producto "${product.nombre}"?`)) return;
-
-  currentCatalog.productos = currentCatalog.productos.filter(p => p.id !== prodId);
-  renderProducts(currentCatalog.productos);
-  await guardarEnNube();
-});
-
-editProductForm.addEventListener('submit', async (event) => {
-  event.preventDefault();
-  const prodId = Number(document.querySelector('#edit-product-id').value);
-  const nombre = document.querySelector('#edit-product-name').value;
-  const descripcion = document.querySelector('#edit-product-description').value;
-  const precio = parseFloat(document.querySelector('#edit-product-price').value);
-  const categoria = editProductCategory.value;
-  const imageFile = document.querySelector('#edit-product-image').files[0];
-
-  const product = currentCatalog.productos.find(p => p.id === prodId);
-  if (!product) return;
-
-  try {
-    let imagenBase64 = product.imagen;
-    if (imageFile) {
-      imagenBase64 = await convertirImagenABase64(imageFile);
+    // Verificar si ya hay una sesión iniciada
+    if (localStorage.getItem('pet360_admin_logged') === 'true') {
+        mostrarPanelAdmin();
+    } else {
+        mostrarLogin();
     }
 
-    product.nombre = nombre;
-    product.descripcion = descripcion;
-    product.precio = precio;
-    product.categoria = categoria;
-    product.imagen = imagenBase64;
-
-    editProductDialog.close();
-    renderProducts(currentCatalog.productos);
-    await guardarEnNube();
-  } catch (error) {
-    dashboardMessage.textContent = 'Error al actualizar el producto.';
-  }
+    configurarEventosAdmin();
 });
 
-document.querySelectorAll('[data-close-dialog]').forEach((button) => {
-  button.addEventListener('click', () => {
-    document.querySelector(`#${button.dataset.closeDialog}`).close();
-  });
-});
+function mostrarLogin() {
+    if (loginCard) loginCard.style.display = 'block';
+    if (adminPage) adminPage.style.display = 'none';
+}
 
-logoutButton.addEventListener('click', () => {
-  sessionStorage.removeItem('admin_logged_in');
-  showLogin();
-  dashboardMessage.textContent = '';
-});
+function mostrarPanelAdmin() {
+    if (loginCard) loginCard.style.display = 'none';
+    if (adminPage) adminPage.style.display = 'block';
+    cargarDatosJSONBin();
+}
+
+function configurarEventosAdmin() {
+    // Formulario de Inicio de Sesión
+    if (loginForm) {
+        loginForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const user = document.getElementById('username').value.trim();
+            const pass = document.getElementById('password').value.trim();
+
+            if (user === ADMIN_USER && pass === ADMIN_PASS) {
+                localStorage.setItem('pet360_admin_logged', 'true');
+                if (loginError) loginError.style.display = 'none';
+                mostrarPanelAdmin();
+            } else {
+                if (loginError) {
+                    loginError.textContent = 'Usuario o contraseña incorrectos';
+                    loginError.style.display = 'block';
+                }
+            }
+        });
+    }
+
+    // Formulario para Agregar/Editar Producto
+    if (formProducto) {
+        formProducto.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await guardarProducto();
+        });
+    }
+
+    // Formulario para Agregar Categoría
+    if (formCategoria) {
+        formCategoria.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await guardarCategoria();
+        });
+    }
+}
+
+// Cargar Datos desde JSONBin.io (Método GET usa /latest)
+async function cargarDatosJSONBin() {
+    try {
+        const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
+            headers: { 'X-Master-Key': API_KEY }
+        });
+
+        if (!res.ok) throw new Error('Error al obtener datos');
+
+        const data = await res.json();
+        productos = data.record.productos || [];
+        categorias = data.record.categorias || [];
+
+        renderizarCategoriasAdmin();
+        renderizarProductosAdmin();
+    } catch (error) {
+        console.error("Error al cargar datos desde JSONBin:", error);
+        alert("Error al cargar los datos del servidor.");
+    }
+}
+
+// Guardar Estructura Completa en JSONBin.io (Método PUT SIN /latest)
+async function actualizarJSONBin() {
+    try {
+        const payload = {
+            productos: productos,
+            categorias: categorias
+        };
+
+        const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Master-Key': API_KEY
+            },
+            body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+            const errData = await res.json();
+            throw new Error(errData.message || 'Error 403 o de permisos al guardar');
+        }
+
+        return true;
+    } catch (error) {
+        console.error("Error en actualizarJSONBin:", error);
+        alert("No se pudieron guardar los cambios en la nube: " + error.message);
+        return false;
+    }
+}
+
+// Función para procesar y guardar un nuevo producto
+async function guardarProducto() {
+    const id = document.getElementById('productoId')?.value;
+    const nombre = document.getElementById('nombreProducto').value.trim();
+    const precio = parseFloat(document.getElementById('precioProducto').value);
+    const categoria = document.getElementById('categoriaProducto').value;
+    const imagen = document.getElementById('imagenProducto').value.trim();
+    const descripcion = document.getElementById('descripcionProducto').value.trim();
+
+    if (!nombre || isNaN(precio)) {
+        alert("Por favor completa los campos obligatorios.");
+        return;
+    }
+
+    if (id) {
+        // Editar producto existente
+        const idx = productos.findIndex(p => p.id == id);
+        if (idx !== -1) {
+            productos[idx] = { id, nombre, precio, categoria, imagen, descripcion };
+        }
+    } else {
+        // Crear nuevo producto
+        const nuevoProd = {
+            id: Date.now().toString(),
+            nombre,
+            precio,
+            categoria,
+            imagen,
+            descripcion
+        };
+        productos.push(nuevoProd);
+    }
+
+    const exito = await actualizarJSONBin();
+    if (exito) {
+        alert("¡Producto guardado exitosamente en la nube!");
+        formProducto.reset();
+        if (document.getElementById('productoId')) document.getElementById('productoId').value = '';
+        renderizarProductosAdmin();
+    }
+}
+
+// Función para agregar una nueva categoría
+async function guardarCategoria() {
+    const nombreCat = document.getElementById('nombreCategoria').value.trim();
+
+    if (!nombreCat) {
+        alert("Ingresa un nombre de categoría válido.");
+        return;
+    }
+
+    // Verificar que no exista previamente
+    const existe = categorias.some(c => (typeof c === 'object' ? c.nombre.toLowerCase() : c.toLowerCase()) === nombreCat.toLowerCase());
+    if (existe) {
+        alert("Esta categoría ya existe.");
+        return;
+    }
+
+    categorias.push({ id: Date.now().toString(), nombre: nombreCat });
+
+    const exito = await actualizarJSONBin();
+    if (exito) {
+        alert("¡Categoría agregada exitosamente!");
+        formCategoria.reset();
+        renderizarCategoriasAdmin();
+    }
+}
+
+function renderizarCategoriasAdmin() {
+    if (!listaCategoriasAdmin) return;
+    listaCategoriasAdmin.innerHTML = '';
+    if (selectCategoriaProducto) selectCategoriaProducto.innerHTML = '<option value="">Selecciona una categoría</option>';
+
+    categorias.forEach((cat, index) => {
+        const nombreCat = typeof cat === 'object' ? cat.nombre : cat;
+        const catId = typeof cat === 'object' ? cat.id : index;
+
+        // Renderizar lista en la vista de administración
+        const card = document.createElement('div');
+        card.className = 'admin-category-card';
+        card.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 0.8rem; border: 1px solid #e2e8f0; margin-bottom: 0.5rem; border-radius: 8rem;';
+        card.innerHTML = `
+            <span><strong>${nombreCat}</strong></span>
+            <div>
+                <button type="button" onclick="eliminarCategoria('${catId}')" style="background:#ef4444; color:white; border:none; padding:0.4rem 0.8rem; border-radius:4px; cursor:pointer;">Eliminar</button>
+            </div>
+        `;
+        listaCategoriasAdmin.appendChild(card);
+
+        // Actualizar el selector en el formulario de agregar producto
+        if (selectCategoriaProducto) {
+            const opt = document.createElement('option');
+            opt.value = nombreCat;
+            opt.textContent = nombreCat;
+            selectCategoriaProducto.appendChild(opt);
+        }
+    });
+}
+
+function renderizarProductosAdmin() {
+    if (!listaProductosAdmin) return;
+    listaProductosAdmin.innerHTML = '';
+
+    if (productos.length === 0) {
+        listaProductosAdmin.innerHTML = `<p style="text-align: center; color: #64748b; padding: 1rem;">No hay productos registrados.</p>`;
+        return;
+    }
+
+    productos.forEach(p => {
+        const card = document.createElement('div');
+        card.className = 'admin-product-card';
+        card.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 0.8rem; border: 1px solid #e2e8f0; margin-bottom: 0.5rem; border-radius: 6px;';
+        card.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 1rem;">
+                <img src="${p.imagen || 'https://via.placeholder.com/60'}" width="50" height="50" style="object-fit:cover; border-radius:4px;">
+                <div>
+                    <strong>${p.nombre}</strong> <small style="color:#64748b;">(${p.categoria || 'Sin categoría'})</small><br>
+                    <span style="color:#10b981; font-weight:bold;">$${Number(p.precio).toFixed(2)}</span>
+                </div>
+            </div>
+            <div>
+                <button type="button" onclick="prepararEdicionProducto('${p.id}')" style="background:#3b82f6; color:white; border:none; padding:0.4rem 0.8rem; border-radius:4px; cursor:pointer; margin-right:0.4rem;">Editar</button>
+                <button type="button" onclick="eliminarProducto('${p.id}')" style="background:#ef4444; color:white; border:none; padding:0.4rem 0.8rem; border-radius:4px; cursor:pointer;">Eliminar</button>
+            </div>
+        `;
+        listaProductosAdmin.appendChild(card);
+    });
+}
+
+window.prepararEdicionProducto = function(id) {
+    const prod = productos.find(p => p.id == id);
+    if (!prod) return;
+
+    if (document.getElementById('productoId')) document.getElementById('productoId').value = prod.id;
+    document.getElementById('nombreProducto').value = prod.nombre;
+    document.getElementById('precioProducto').value = prod.precio;
+    document.getElementById('categoriaProducto').value = prod.categoria || '';
+    document.getElementById('imagenProducto').value = prod.imagen || '';
+    document.getElementById('descripcionProducto').value = prod.descripcion || '';
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+};
+
+window.eliminarProducto = async function(id) {
+    if (!confirm("¿Estás seguro de que deseas eliminar este producto?")) return;
+
+    productos = productos.filter(p => p.id != id);
+    const exito = await actualizarJSONBin();
+    if (exito) {
+        alert("Producto eliminado.");
+        renderizarProductosAdmin();
+    }
+};
+
+window.eliminarCategoria = async function(catId) {
+    if (!confirm("¿Deseas eliminar esta categoría?")) return;
+
+    categorias = categorias.filter((c, index) => {
+        const id = typeof c === 'object' ? c.id : index;
+        return id != catId;
+    });
+
+    const exito = await actualizarJSONBin();
+    if (exito) {
+        alert("Categoría eliminada.");
+        renderizarCategoriasAdmin();
+    }
+};
+
+// Cerrar sesión
+window.cerrarSesionAdmin = function() {
+    localStorage.removeItem('pet360_admin_logged');
+    mostrarLogin();
+};
