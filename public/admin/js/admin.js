@@ -299,6 +299,20 @@ if (editCategoryForm) {
   });
 }
 
+// Función auxiliar para convertir imagen local a Base64
+function convertirImagenABase64(file) {
+  return new Promise((resolve, reject) => {
+    if (!file) {
+      resolve('https://via.placeholder.com/240x170');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = error => reject(error);
+    reader.readAsDataURL(file);
+  });
+}
+
 // Agregar Producto
 if (productForm) {
   productForm.addEventListener('submit', async (event) => {
@@ -311,19 +325,18 @@ if (productForm) {
     const descripcion = document.getElementById('product-description').value;
     const precio = parseFloat(document.getElementById('product-price').value);
     const categoria = productCategory.value;
-    const imagenInput = document.getElementById('product-image');
-    
-    // Soporta tanto campo URL como input local si luego deciden conectarlo
-    const imagenUrl = imagenInput ? (imagenInput.value || 'https://via.placeholder.com/240x170') : 'https://via.placeholder.com/240x170';
+    const imageFile = document.getElementById('product-image').files[0];
 
     try {
+      const imagenBase64 = await convertirImagenABase64(imageFile);
+
       const nuevoProducto = {
         id: Date.now().toString(),
         nombre,
         descripcion,
         precio,
         categoria,
-        imagen: imagenUrl
+        imagen: imagenBase64
       };
 
       const res = await fetch(`${SHEETDB_URL}?sheet=productos`, {
@@ -394,18 +407,24 @@ if (editProductForm) {
     const descripcion = document.querySelector('#edit-product-description').value;
     const precio = parseFloat(document.querySelector('#edit-product-price').value);
     const categoria = editProductCategory.value;
+    const imageFile = document.querySelector('#edit-product-image').files[0];
 
     const product = currentCatalog.productos.find(p => String(p.id) === prodId);
     if (!product) return;
 
     if (dashboardMessage) dashboardMessage.textContent = 'Actualizando producto...';
     try {
+      let imagenBase64 = product.imagen;
+      if (imageFile) {
+        imagenBase64 = await convertirImagenABase64(imageFile);
+      }
+
       const datosActualizados = {
         nombre,
         descripcion,
         precio,
         categoria,
-        imagen: product.imagen
+        imagen: imagenBase64
       };
 
       const res = await fetch(`${SHEETDB_URL}/id/${prodId}?sheet=productos`, {
@@ -420,6 +439,7 @@ if (editProductForm) {
       product.descripcion = descripcion;
       product.precio = precio;
       product.categoria = categoria;
+      product.imagen = imagenBase64;
 
       editProductDialog.close();
       renderProducts(currentCatalog.productos);
