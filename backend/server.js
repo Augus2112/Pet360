@@ -420,7 +420,6 @@ app.post('/api/admin/logout', (req, res, next) => {
 
 app.use('/admin', express.static(path.join(projectRoot, 'public', 'admin')));
 app.use('/cliente', express.static(path.join(projectRoot, 'public', 'cliente')));
-app.use('/img', express.static(path.join(projectRoot, 'public', 'img')));
 app.use('/uploads', express.static(uploadDirectory));
 
 app.get('/', (req, res) => {

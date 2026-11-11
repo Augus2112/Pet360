@@ -1,3 +1,11 @@
+// Credenciales de acceso directo
+const ADMIN_USER = "pet360admin";
+const ADMIN_PASS = "admin123";
+
+// Configuración de JSONBin
+const BIN_ID = '6af3e690ffd5d16053b85a92';
+const API_KEY = '$2a$10$OnZ5OXF8hEQN4S6BEcNDTO2v3SzWKV1CDFQ1.yjYaYAOYB5kZWhd6'; // Reemplaza por tu Master Key de la pestaña API KEYS
+
 const adminPage = document.querySelector('.admin-page');
 const loginCard = document.querySelector('#login-card');
 const adminIllustration = document.querySelector('#admin-illustration');
@@ -26,24 +34,19 @@ const editCategoryPlaceholder = editProductCategory.querySelector('option').clon
 
 let currentCatalog = { categorias: [], productos: [] };
 
-document.addEventListener('DOMContentLoaded', async () => {
-  try {
-    const response = await fetch('/api/admin/session', { cache: 'no-store' });
-    const result = await readResponse(response);
-    if (!result.authenticated) {
-      showLogin();
-      return;
-    }
-
-    showDashboard();
-    dashboardMessage.textContent = 'Cargando catálogo...';
-    await loadCatalog();
-    dashboardMessage.textContent = 'Puedes administrar tu catálogo.';
-  } catch (error) {
-    showLogin();
-    formMessage.textContent = getRequestErrorMessage(error, 'No se pudo verificar la sesión.');
-  }
+document.addEventListener('DOMContentLoaded', () => {
+  verificarSesion();
 });
+
+function verificarSesion() {
+  const sesionActiva = sessionStorage.getItem('admin_logged_in');
+  if (sesionActiva === 'true') {
+    showDashboard();
+    loadCatalog();
+  } else {
+    showLogin();
+  }
+}
 
 function showDashboard() {
   adminPage.classList.add('dashboard-active');
@@ -59,32 +62,50 @@ function showLogin() {
   dashboard.hidden = true;
 }
 
-async function readResponse(response) {
-  if (response.status === 204) return null;
-  const result = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(result.error || 'No se pudo completar la solicitud.');
-  }
-  return result;
-}
-
-function getRequestErrorMessage(error, fallback) {
-  if (error instanceof TypeError) {
-    return 'No se pudo conectar con el servidor. Inicia Pet360 y abre el panel desde http://localhost:3000/admin/.';
-  }
-  return error.message || fallback;
-}
-
+// Cargar catálogo desde JSONBin
 async function loadCatalog() {
-  const response = await fetch('/api/catalogo', { cache: 'no-store' });
-  const catalog = await readResponse(response);
-  if (!Array.isArray(catalog.categorias) || !Array.isArray(catalog.productos)) {
-    throw new Error('El catálogo tiene un formato no válido.');
-  }
+  dashboardMessage.textContent = 'Cargando catálogo desde la nube...';
+  try {
+    const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
+      headers: { 'X-Master-Key': API_KEY }
+    });
+    
+    if (!res.ok) throw new Error('Error al conectar con la base de datos');
 
-  currentCatalog = catalog;
-  renderCategories(catalog.categorias);
-  renderProducts(catalog.productos, catalog.categorias);
+    const data = await res.json();
+    currentCatalog.productos = data.record.productos || [];
+    currentCatalog.categorias = data.record.categorias || [
+      { id: 1, nombre: 'Alimento' },
+      { id: 2, nombre: 'Accesorios' },
+      { id: 3, nombre: 'Gatos' }
+    ];
+
+    renderCategories(currentCatalog.categorias);
+    renderProducts(currentCatalog.productos);
+    dashboardMessage.textContent = 'Catálogo actualizado en tiempo real.';
+  } catch (e) {
+    dashboardMessage.textContent = 'Error al cargar catálogo desde la nube.';
+  }
+}
+
+// Guardar todo el objeto en JSONBin
+async function guardarEnNube() {
+  dashboardMessage.textContent = 'Guardando cambios en la nube...';
+  try {
+    const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Master-Key': API_KEY
+      },
+      body: JSON.stringify(currentCatalog)
+    });
+
+    if (!res.ok) throw new Error('Error al guardar');
+    dashboardMessage.textContent = '¡Cambios guardados con éxito en la nube!';
+  } catch (e) {
+    dashboardMessage.textContent = 'Error al guardar cambios en la nube.';
+  }
 }
 
 function renderCategories(categories) {
@@ -122,17 +143,16 @@ function renderCategories(categories) {
     categoryList.append(item);
 
     const option = document.createElement('option');
-    option.value = String(category.id);
+    option.value = category.nombre;
     option.textContent = category.nombre;
     productCategory.append(option.cloneNode(true));
     editProductCategory.append(option);
   }
 }
 
-function renderProducts(products, categories) {
+function renderProducts(products) {
   productList.replaceChildren();
   emptyProducts.hidden = products.length > 0;
-  const categoryNames = new Map(categories.map(category => [category.id, category.nombre]));
 
   for (const product of products) {
     const item = document.createElement('li');
@@ -150,7 +170,7 @@ function renderProducts(products, categories) {
     name.textContent = product.nombre;
 
     const categoryName = document.createElement('p');
-    categoryName.textContent = `Categoría: ${categoryNames.get(product.categoriaId) || 'Sin categoría'}`;
+    categoryName.textContent = product.categoria ? `Categoría: ${product.categoria}` : 'Sin categoría';
 
     const price = document.createElement('p');
     price.className = 'product-price';
@@ -178,126 +198,115 @@ function renderProducts(products, categories) {
   }
 }
 
-loginForm.addEventListener('submit', async (event) => {
+loginForm.addEventListener('submit', (event) => {
   event.preventDefault();
   formMessage.textContent = '';
-  loginButton.disabled = true;
 
   const formData = new FormData(loginForm);
-  try {
-    const response = await fetch('/api/admin/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        username: formData.get('username'),
-        password: formData.get('password'),
-      }),
-    });
-    await readResponse(response);
+  const user = formData.get('username');
+  const pass = formData.get('password');
+
+  if (user === ADMIN_USER && pass === ADMIN_PASS) {
+    sessionStorage.setItem('admin_logged_in', 'true');
     loginForm.reset();
     showDashboard();
-    dashboardMessage.textContent = 'Sesión iniciada. Cargando catálogo...';
-    await loadCatalog();
-    dashboardMessage.textContent = 'Sesión iniciada. Puedes administrar tu catálogo.';
-  } catch (error) {
-    formMessage.textContent = getRequestErrorMessage(error, 'No se pudo iniciar sesión. Inténtalo de nuevo.');
-  } finally {
-    loginButton.disabled = false;
+    loadCatalog();
+  } else {
+    formMessage.textContent = 'Usuario o contraseña incorrectos.';
   }
 });
 
 categoryForm.addEventListener('submit', async (event) => {
   event.preventDefault();
-  const submitButton = categoryForm.querySelector('button[type="submit"]');
-  submitButton.disabled = true;
+  const nombreCat = categoryInput.value.trim();
+  if (!nombreCat) return;
 
-  try {
-    const response = await fetch('/api/categorias', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nombre: categoryInput.value }),
-    });
-    const category = await readResponse(response);
-    categoryForm.reset();
-    await loadCatalog();
-    dashboardMessage.textContent = `Categoría "${category.nombre}" agregada.`;
-  } catch (error) {
-    dashboardMessage.textContent = getRequestErrorMessage(error, 'No se pudo agregar la categoría.');
-  } finally {
-    submitButton.disabled = false;
-  }
+  const nuevaCat = { id: Date.now(), nombre: nombreCat };
+  currentCatalog.categorias.push(nuevaCat);
+
+  categoryForm.reset();
+  renderCategories(currentCatalog.categorias);
+  await guardarEnNube();
 });
 
 categoryList.addEventListener('click', async (event) => {
   const button = event.target.closest('button[data-action]');
   if (!button) return;
 
-  const categoryId = Number(button.dataset.id);
-  const category = currentCatalog.categorias.find(item => item.id === categoryId);
+  const catId = Number(button.dataset.id);
+  const category = currentCatalog.categorias.find((item) => item.id === catId);
   if (!category) return;
 
   if (button.dataset.action === 'edit-category') {
     editCategoryId.value = String(category.id);
     editCategoryName.value = category.nombre;
     editCategoryDialog.showModal();
-    editCategoryName.focus();
     return;
   }
 
   if (!window.confirm(`¿Eliminar la categoría "${category.nombre}"?`)) return;
-  button.disabled = true;
 
-  try {
-    const response = await fetch(`/api/categorias/${categoryId}`, { method: 'DELETE' });
-    await readResponse(response);
-    await loadCatalog();
-    dashboardMessage.textContent = `Categoría "${category.nombre}" eliminada.`;
-  } catch (error) {
-    dashboardMessage.textContent = getRequestErrorMessage(error, 'No se pudo eliminar la categoría.');
-  } finally {
-    button.disabled = false;
-  }
+  currentCatalog.categorias = currentCatalog.categorias.filter(c => c.id !== catId);
+  renderCategories(currentCatalog.categorias);
+  await guardarEnNube();
 });
 
 editCategoryForm.addEventListener('submit', async (event) => {
   event.preventDefault();
-  const submitButton = editCategoryForm.querySelector('button[type="submit"]');
-  submitButton.disabled = true;
+  const catId = Number(editCategoryId.value);
+  const nuevoNombre = editCategoryName.value.trim();
 
-  try {
-    const response = await fetch(`/api/categorias/${editCategoryId.value}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nombre: editCategoryName.value }),
-    });
-    const category = await readResponse(response);
+  const cat = currentCatalog.categorias.find(c => c.id === catId);
+  if (cat) {
+    cat.nombre = nuevoNombre;
     editCategoryDialog.close();
-    await loadCatalog();
-    dashboardMessage.textContent = `Categoría "${category.nombre}" actualizada.`;
-  } catch (error) {
-    dashboardMessage.textContent = getRequestErrorMessage(error, 'No se pudo actualizar la categoría.');
-  } finally {
-    submitButton.disabled = false;
+    renderCategories(currentCatalog.categorias);
+    await guardarEnNube();
   }
 });
+
+function convertirImagenABase64(file) {
+  return new Promise((resolve, reject) => {
+    if (!file) {
+      resolve('https://via.placeholder.com/240x170');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = error => reject(error);
+    reader.readAsDataURL(file);
+  });
+}
 
 productForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   const submitButton = productForm.querySelector('button[type="submit"]');
   submitButton.disabled = true;
-  dashboardMessage.textContent = '';
+
+  const nombre = document.getElementById('product-name').value;
+  const descripcion = document.getElementById('product-description').value;
+  const precio = parseFloat(document.getElementById('product-price').value);
+  const categoria = productCategory.value;
+  const imageFile = document.getElementById('product-image').files[0];
 
   try {
-    const response = await fetch('/api/productos', {
-      method: 'POST',
-      body: new FormData(productForm),
-    });
-    const product = await readResponse(response);
+    const imagenBase64 = await convertirImagenABase64(imageFile);
+
+    const nuevoProducto = {
+      id: Date.now(),
+      nombre,
+      descripcion,
+      precio,
+      categoria,
+      imagen: imagenBase64
+    };
+
+    currentCatalog.productos.push(nuevoProducto);
     productForm.reset();
-    await loadCatalog();
-    dashboardMessage.textContent = `Producto "${product.nombre}" agregado correctamente.`;
+    renderProducts(currentCatalog.productos);
+    await guardarEnNube();
   } catch (error) {
-    dashboardMessage.textContent = getRequestErrorMessage(error, 'No se pudo agregar el producto.');
+    dashboardMessage.textContent = 'Error al procesar la imagen.';
   } finally {
     submitButton.disabled = false;
   }
@@ -307,8 +316,8 @@ productList.addEventListener('click', async (event) => {
   const button = event.target.closest('button[data-action]');
   if (!button) return;
 
-  const productId = Number(button.dataset.id);
-  const product = currentCatalog.productos.find(item => item.id === productId);
+  const prodId = Number(button.dataset.id);
+  const product = currentCatalog.productos.find((item) => item.id === prodId);
   if (!product) return;
 
   if (button.dataset.action === 'edit-product') {
@@ -316,47 +325,48 @@ productList.addEventListener('click', async (event) => {
     document.querySelector('#edit-product-name').value = product.nombre;
     document.querySelector('#edit-product-description').value = product.descripcion || '';
     document.querySelector('#edit-product-price').value = String(product.precio);
-    editProductCategory.value = String(product.categoriaId);
+    editProductCategory.value = product.categoria;
     document.querySelector('#edit-product-image').value = '';
     editProductDialog.showModal();
-    document.querySelector('#edit-product-name').focus();
     return;
   }
 
   if (!window.confirm(`¿Eliminar el producto "${product.nombre}"?`)) return;
-  button.disabled = true;
 
-  try {
-    const response = await fetch(`/api/productos/${productId}`, { method: 'DELETE' });
-    const result = await readResponse(response);
-    await loadCatalog();
-    dashboardMessage.textContent = result.warning || `Producto "${product.nombre}" eliminado.`;
-  } catch (error) {
-    dashboardMessage.textContent = getRequestErrorMessage(error, 'No se pudo eliminar el producto.');
-  } finally {
-    button.disabled = false;
-  }
+  currentCatalog.productos = currentCatalog.productos.filter(p => p.id !== prodId);
+  renderProducts(currentCatalog.productos);
+  await guardarEnNube();
 });
 
 editProductForm.addEventListener('submit', async (event) => {
   event.preventDefault();
-  const productId = document.querySelector('#edit-product-id').value;
-  const submitButton = editProductForm.querySelector('button[type="submit"]');
-  submitButton.disabled = true;
+  const prodId = Number(document.querySelector('#edit-product-id').value);
+  const nombre = document.querySelector('#edit-product-name').value;
+  const descripcion = document.querySelector('#edit-product-description').value;
+  const precio = parseFloat(document.querySelector('#edit-product-price').value);
+  const categoria = editProductCategory.value;
+  const imageFile = document.querySelector('#edit-product-image').files[0];
+
+  const product = currentCatalog.productos.find(p => p.id === prodId);
+  if (!product) return;
 
   try {
-    const response = await fetch(`/api/productos/${productId}`, {
-      method: 'PUT',
-      body: new FormData(editProductForm),
-    });
-    const product = await readResponse(response);
+    let imagenBase64 = product.imagen;
+    if (imageFile) {
+      imagenBase64 = await convertirImagenABase64(imageFile);
+    }
+
+    product.nombre = nombre;
+    product.descripcion = descripcion;
+    product.precio = precio;
+    product.categoria = categoria;
+    product.imagen = imagenBase64;
+
     editProductDialog.close();
-    await loadCatalog();
-    dashboardMessage.textContent = product.warning || `Producto "${product.nombre}" actualizado correctamente.`;
+    renderProducts(currentCatalog.productos);
+    await guardarEnNube();
   } catch (error) {
-    dashboardMessage.textContent = getRequestErrorMessage(error, 'No se pudo actualizar el producto.');
-  } finally {
-    submitButton.disabled = false;
+    dashboardMessage.textContent = 'Error al actualizar el producto.';
   }
 });
 
@@ -366,17 +376,8 @@ document.querySelectorAll('[data-close-dialog]').forEach((button) => {
   });
 });
 
-logoutButton.addEventListener('click', async () => {
-  logoutButton.disabled = true;
-
-  try {
-    const response = await fetch('/api/admin/logout', { method: 'POST' });
-    await readResponse(response);
-    showLogin();
-    dashboardMessage.textContent = '';
-  } catch (error) {
-    dashboardMessage.textContent = getRequestErrorMessage(error, 'No se pudo cerrar sesión.');
-  } finally {
-    logoutButton.disabled = false;
-  }
+logoutButton.addEventListener('click', () => {
+  sessionStorage.removeItem('admin_logged_in');
+  showLogin();
+  dashboardMessage.textContent = '';
 });
