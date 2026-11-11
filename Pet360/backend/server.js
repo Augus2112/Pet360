@@ -1,7 +1,8 @@
 const express = require('express');
 const session = require('express-session');
 const dotenv = require('dotenv');
-const { randomUUID, timingSafeEqual } = require('node:crypto');
+const { randomBytes, randomUUID, scryptSync, timingSafeEqual } = require('node:crypto');
+const { DatabaseSync } = require('node:sqlite');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const multer = require('multer');
@@ -12,6 +13,7 @@ dotenv.config({ path: path.join(projectRoot, '.env') });
 const app = express();
 const port = process.env.PORT || 3000;
 const catalogPath = path.join(projectRoot, 'data', 'productos.json');
+const credentialsDatabasePath = path.join(projectRoot, 'data', 'admin.sqlite');
 const uploadDirectory = path.join(projectRoot, 'uploads');
 const imageTypes = new Map([
   ['image/jpeg', '.jpg'],
@@ -23,6 +25,17 @@ let catalogWriteQueue = Promise.resolve();
 if (!process.env.SESSION_SECRET) {
   throw new Error('Configura SESSION_SECRET en el archivo .env antes de iniciar el servidor.');
 }
+
+const credentialsDatabase = new DatabaseSync(credentialsDatabasePath);
+credentialsDatabase.exec(`
+  CREATE TABLE IF NOT EXISTS admin_credentials (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    username TEXT NOT NULL UNIQUE,
+    password_salt BLOB NOT NULL,
+    password_hash BLOB NOT NULL
+  )
+`);
+initializeAdminCredentials();
 
 if (process.env.NODE_ENV === 'production') {
   app.set('trust proxy', 1);
@@ -338,12 +351,6 @@ app.get('/api/admin/session', (req, res) => {
 
 app.post('/api/admin/login', (req, res, next) => {
   const { username, password } = req.body || {};
-  const expectedUsername = process.env.ADMIN_USER;
-  const expectedPassword = process.env.ADMIN_PASS;
-
-  if (!expectedUsername || !expectedPassword) {
-    return res.status(503).json({ error: 'El acceso administrativo no está configurado.' });
-  }
 
   if (typeof username !== 'string' || typeof password !== 'string') {
     return res.status(401).json({ error: 'Usuario o contraseña incorrectos.' });
@@ -353,8 +360,16 @@ app.post('/api/admin/login', (req, res, next) => {
     return res.status(401).json({ error: 'Usuario o contraseña incorrectos.' });
   }
 
-  const usernameMatches = safeEqual(username, expectedUsername);
-  const passwordMatches = safeEqual(password, expectedPassword);
+  const credentials = credentialsDatabase.prepare(
+    'SELECT username, password_salt, password_hash FROM admin_credentials WHERE id = ?',
+  ).get(1);
+  const usernameMatches = credentials && safeEqual(username, credentials.username);
+  const passwordHash = credentials
+    ? scryptSync(password, credentials.password_salt, credentials.password_hash.length)
+    : Buffer.alloc(64);
+  const storedPasswordHash = credentials ? Buffer.from(credentials.password_hash) : Buffer.alloc(64);
+  const passwordMatches = timingSafeEqual(passwordHash, storedPasswordHash);
+
   if (!usernameMatches || !passwordMatches) {
     return res.status(401).json({ error: 'Usuario o contraseña incorrectos.' });
   }
@@ -535,4 +550,28 @@ function safeEqual(value, expected) {
   }
 
   return timingSafeEqual(valueBuffer, expectedBuffer);
+}
+
+function initializeAdminCredentials() {
+  const existingAdmin = credentialsDatabase.prepare(
+    'SELECT id FROM admin_credentials WHERE id = ?',
+  ).get(1);
+
+  if (existingAdmin) {
+    return;
+  }
+
+  const username = process.env.ADMIN_USER;
+  const password = process.env.ADMIN_PASS;
+  if (!username || !password) {
+    throw new Error(
+      'No hay credenciales de administrador en SQL. Configura ADMIN_USER y ADMIN_PASS en .env para inicializar la base de datos.',
+    );
+  }
+
+  const salt = randomBytes(16);
+  const passwordHash = scryptSync(password, salt, 64);
+  credentialsDatabase.prepare(
+    'INSERT INTO admin_credentials (id, username, password_salt, password_hash) VALUES (?, ?, ?, ?)',
+  ).run(1, username, salt, passwordHash);
 }

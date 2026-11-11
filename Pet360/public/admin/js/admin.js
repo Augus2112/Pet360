@@ -49,6 +49,18 @@ async function readResponse(response) {
   return result;
 }
 
+function getRequestErrorMessage(error, fallback) {
+  if (location.protocol === 'file:') {
+    return 'Abre el panel desde http://localhost:3000/admin/ y ejecuta "npm start" dentro de la carpeta Pet360.';
+  }
+
+  if (error instanceof TypeError) {
+    return 'No se pudo conectar con el servidor. Ejecuta "npm start" dentro de la carpeta Pet360 y vuelve a abrir http://localhost:3000/admin/.';
+  }
+
+  return error.message || fallback;
+}
+
 async function loadCatalog() {
   const response = await fetch('/api/catalogo');
   currentCatalog = await readResponse(response);
@@ -172,9 +184,9 @@ loginForm.addEventListener('submit', async (event) => {
     dashboardMessage.textContent = 'Sesión iniciada. Puedes administrar tu catálogo.';
   } catch (error) {
     if (dashboard.hidden) {
-      formMessage.textContent = error.message || 'No se pudo conectar con el servidor. Inténtalo de nuevo.';
+      formMessage.textContent = getRequestErrorMessage(error, 'No se pudo iniciar sesión. Inténtalo de nuevo.');
     } else {
-      dashboardMessage.textContent = error.message || 'No se pudo cargar el catálogo.';
+      dashboardMessage.textContent = getRequestErrorMessage(error, 'No se pudo cargar el catálogo.');
     }
   } finally {
     loginButton.disabled = false;
