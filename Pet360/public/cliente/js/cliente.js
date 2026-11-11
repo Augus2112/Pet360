@@ -4,6 +4,7 @@ const STORAGE_KEY = 'productos_pet360';
 let productos = [];
 let carrito = [];
 let categoriaActual = 'todos';
+let toastTimeout;
 
 // Elementos del DOM
 const productsGrid = document.getElementById('productsGrid');
@@ -17,6 +18,10 @@ const cartItemsList = document.getElementById('cartItemsList');
 const cartTotalText = document.getElementById('cartTotalText');
 const checkoutForm = document.getElementById('checkoutForm');
 const clientNameInput = document.getElementById('clientName');
+
+// Elementos de la Notificación Toast
+const toastNotification = document.getElementById('toastNotification');
+const toastMessage = document.getElementById('toastMessage');
 
 // Elementos del Modal de Producto
 const productModal = document.getElementById('productModal');
@@ -178,9 +183,21 @@ function agregarAlCarrito(id, cantidad) {
     }
 
     actualizarCarritoUI();
-    
+    mostrarNotificacion(`${cantidad}x "${productoEncontrado.nombre}" agregado(s)`);
+
     const input = document.getElementById(`qty-${id}`);
     if (input) input.value = 1;
+}
+
+function mostrarNotificacion(mensaje) {
+    if (toastTimeout) clearTimeout(toastTimeout);
+    
+    toastMessage.textContent = mensaje;
+    toastNotification.classList.add('active');
+
+    toastTimeout = setTimeout(() => {
+        toastNotification.classList.remove('active');
+    }, 2500);
 }
 
 function actualizarCarritoUI() {
@@ -246,7 +263,6 @@ function configurarEventos() {
         }
     });
 
-    // Validación en tiempo real: Evitar que se escriban números en el campo de nombre
     if (clientNameInput) {
         clientNameInput.addEventListener('input', (e) => {
             e.target.value = e.target.value.replace(/[0-9]/g, '');
@@ -262,7 +278,6 @@ function configurarEventos() {
 
         const nombre = clientNameInput.value.trim();
         
-        // Comprobación adicional al enviar el formulario
         const soloLetrasRegex = /^[A-Za-zÁÉÍÓÚáéíóúÑñ\s]+$/;
         if (!soloLetrasRegex.test(nombre)) {
             alert("Por favor, ingresa un nombre válido que contenga solo letras.");
