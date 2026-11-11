@@ -1,6 +1,5 @@
-// Configuración de JSONBin
-const BIN_ID = '6af3e690ffd5d16053b85a92';
-const API_KEY = '$2a$10$OnZ5OXF8hEQN4S6BEcNDTO2v3SzWKV1CDFQ1.yjYaYAOYB5kZWhd6'; // Reemplaza por tu Master Key de la pestaña API KEYS
+// Configuración de SheetDB (Google Sheets)
+const SHEETDB_URL = 'https://sheetdb.io/api/v1/xqcm1sjvwwpno';
 
 let productos = [];
 let carrito = [];
@@ -42,14 +41,14 @@ async function cargarProductos() {
     try {
         productsGrid.innerHTML = `<p style="grid-column: 1/-1; text-align: center; color: #64748b; padding: 2rem;">Cargando productos...</p>`;
         
-        const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
-            headers: { 'X-Master-Key': API_KEY }
-        });
+        const [resProd] = await Promise.all([
+            fetch(`${SHEETDB_URL}?sheet=productos`)
+        ]);
 
-        if (!res.ok) throw new Error('Error al obtener datos');
+        if (!resProd.ok) throw new Error('Error al obtener datos de Google Sheets');
 
-        const data = await res.json();
-        productos = data.record.productos || [];
+        const productosData = await resProd.json();
+        productos = Array.isArray(productosData) ? productosData : [];
         
         renderizarCategorias();
         filtrarYMostrarProductos();
@@ -155,7 +154,7 @@ function renderizarProductos(lista) {
 }
 
 function abrirDetalleProducto(id) {
-    const producto = productos.find(p => p.id == id);
+    const producto = productos.find(p => String(p.id) === String(id));
     if (!producto) return;
 
     modalProductImg.src = producto.imagen || 'https://via.placeholder.com/400x300';
@@ -169,10 +168,10 @@ function abrirDetalleProducto(id) {
 }
 
 function agregarAlCarrito(id, cantidad) {
-    const productoEncontrado = productos.find(p => p.id == id);
+    const productoEncontrado = productos.find(p => String(p.id) === String(id));
     if (!productoEncontrado) return;
 
-    const index = carrito.findIndex(item => item.id == id);
+    const index = carrito.findIndex(item => String(item.id) === String(id));
     if (index > -1) {
         carrito[index].cantidad += cantidad;
     } else {

@@ -2,9 +2,8 @@
 const ADMIN_USER = "pet360admin";
 const ADMIN_PASS = "admin123";
 
-// Configuración de JSONBin
-const BIN_ID = '6af3e690ffd5d16053b85a92';
-const API_KEY = '$2a$10$OnZ5OXF8hEQN4S6BEcNDTO2v3SzWKV1CDFQ1.yjYaYAOYB5kZWhd6'; // Reemplaza por tu Master Key de la pestaña API KEYS
+// Configuración de SheetDB (Google Sheets)
+const SHEETDB_URL = 'https://sheetdb.io/api/v1/xqcm1sjvwwpno';
 
 const adminPage = document.querySelector('.admin-page');
 const loginCard = document.querySelector('#login-card');
@@ -62,49 +61,33 @@ function showLogin() {
   dashboard.hidden = true;
 }
 
-// Cargar catálogo desde JSONBin
+// Cargar catálogo desde Google Sheets (SheetDB)
 async function loadCatalog() {
-  dashboardMessage.textContent = 'Cargando catálogo desde la nube...';
+  dashboardMessage.textContent = 'Cargando catálogo desde Google Sheets...';
   try {
-    const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
-      headers: { 'X-Master-Key': API_KEY }
-    });
+    const [resProd, resCat] = await Promise.all([
+      fetch(`${SHEETDB_URL}?sheet=productos`),
+      fetch(`${SHEETDB_URL}?sheet=categorias`)
+    ]);
     
-    if (!res.ok) throw new Error('Error al conectar con la base de datos');
+    if (!resProd.ok || !resCat.ok) throw new Error('Error al conectar con Google Sheets');
 
-    const data = await res.json();
-    currentCatalog.productos = data.record.productos || [];
-    currentCatalog.categorias = data.record.categorias || [
-      { id: 1, nombre: 'Alimento' },
-      { id: 2, nombre: 'Accesorios' },
-      { id: 3, nombre: 'Gatos' }
+    const productosData = await resProd.json();
+    const categoriasData = await resCat.json();
+
+    currentCatalog.productos = Array.isArray(productosData) ? productosData : [];
+    currentCatalog.categorias = Array.isArray(categoriasData) && categoriasData.length > 0 ? categoriasData : [
+      { id: '1', nombre: 'Alimento' },
+      { id: '2', nombre: 'Accesorios' },
+      { id: '3', nombre: 'Gatos' }
     ];
 
     renderCategories(currentCatalog.categorias);
     renderProducts(currentCatalog.productos);
-    dashboardMessage.textContent = 'Catálogo actualizado en tiempo real.';
+    dashboardMessage.textContent = 'Catálogo sincronizado con Google Sheets.';
   } catch (e) {
-    dashboardMessage.textContent = 'Error al cargar catálogo desde la nube.';
-  }
-}
-
-// Guardar todo el objeto en JSONBin
-async function guardarEnNube() {
-  dashboardMessage.textContent = 'Guardando cambios en la nube...';
-  try {
-    const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Master-Key': API_KEY
-      },
-      body: JSON.stringify(currentCatalog)
-    });
-
-    if (!res.ok) throw new Error('Error al guardar');
-    dashboardMessage.textContent = '¡Cambios guardados con éxito en la nube!';
-  } catch (e) {
-    dashboardMessage.textContent = 'Error al guardar cambios en la nube.';
+    console.error(e);
+    dashboardMessage.textContent = 'Error al cargar catálogo desde Google Sheets.';
   }
 }
 
@@ -216,29 +199,44 @@ loginForm.addEventListener('submit', (event) => {
   }
 });
 
+// Agregar Categoría (POST a la pestaña 'categorias')
 categoryForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   const nombreCat = categoryInput.value.trim();
   if (!nombreCat) return;
 
-  const nuevaCat = { id: Date.now(), nombre: nombreCat };
-  currentCatalog.categorias.push(nuevaCat);
+  const nuevaCat = { id: Date.now().toString(), nombre: nombreCat };
 
-  categoryForm.reset();
-  renderCategories(currentCatalog.categorias);
-  await guardarEnNube();
+  dashboardMessage.textContent = 'Guardando categoría...';
+  try {
+    const res = await fetch(`${SHEETDB_URL}?sheet=categorias`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: [nuevaCat] })
+    });
+
+    if (!res.ok) throw new Error('Error al guardar categoría');
+
+    currentCatalog.categorias.push(nuevaCat);
+    categoryForm.reset();
+    renderCategories(currentCatalog.categorias);
+    dashboardMessage.textContent = '¡Categoría guardada con éxito!';
+  } catch (e) {
+    console.error(e);
+    dashboardMessage.textContent = 'Error al guardar categoría en Google Sheets.';
+  }
 });
 
 categoryList.addEventListener('click', async (event) => {
   const button = event.target.closest('button[data-action]');
   if (!button) return;
 
-  const catId = Number(button.dataset.id);
-  const category = currentCatalog.categorias.find((item) => item.id === catId);
+  const catId = String(button.dataset.id);
+  const category = currentCatalog.categorias.find((item) => String(item.id) === catId);
   if (!category) return;
 
   if (button.dataset.action === 'edit-category') {
-    editCategoryId.value = String(category.id);
+    editCategoryId.value = catId;
     editCategoryName.value = category.nombre;
     editCategoryDialog.showModal();
     return;
@@ -246,22 +244,49 @@ categoryList.addEventListener('click', async (event) => {
 
   if (!window.confirm(`¿Eliminar la categoría "${category.nombre}"?`)) return;
 
-  currentCatalog.categorias = currentCatalog.categorias.filter(c => c.id !== catId);
-  renderCategories(currentCatalog.categorias);
-  await guardarEnNube();
+  dashboardMessage.textContent = 'Eliminando categoría...';
+  try {
+    const res = await fetch(`${SHEETDB_URL}/id/${catId}?sheet=categorias`, {
+      method: 'DELETE'
+    });
+
+    if (!res.ok) throw new Error('Error al eliminar');
+
+    currentCatalog.categorias = currentCatalog.categorias.filter(c => String(c.id) !== catId);
+    renderCategories(currentCatalog.categorias);
+    dashboardMessage.textContent = 'Categoría eliminada con éxito.';
+  } catch (e) {
+    console.error(e);
+    dashboardMessage.textContent = 'Error al eliminar categoría.';
+  }
 });
 
 editCategoryForm.addEventListener('submit', async (event) => {
   event.preventDefault();
-  const catId = Number(editCategoryId.value);
+  const catId = String(editCategoryId.value);
   const nuevoNombre = editCategoryName.value.trim();
 
-  const cat = currentCatalog.categorias.find(c => c.id === catId);
-  if (cat) {
-    cat.nombre = nuevoNombre;
+  dashboardMessage.textContent = 'Actualizando categoría...';
+  try {
+    const res = await fetch(`${SHEETDB_URL}/id/${catId}?sheet=categorias`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: { nombre: nuevoNombre } })
+    });
+
+    if (!res.ok) throw new Error('Error al actualizar');
+
+    const cat = currentCatalog.categorias.find(c => String(c.id) === catId);
+    if (cat) {
+      cat.nombre = nuevoNombre;
+    }
+
     editCategoryDialog.close();
     renderCategories(currentCatalog.categorias);
-    await guardarEnNube();
+    dashboardMessage.textContent = 'Categoría actualizada con éxito.';
+  } catch (e) {
+    console.error(e);
+    dashboardMessage.textContent = 'Error al actualizar categoría.';
   }
 });
 
@@ -278,10 +303,12 @@ function convertirImagenABase64(file) {
   });
 }
 
+// Agregar Producto (POST a la pestaña 'productos')
 productForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   const submitButton = productForm.querySelector('button[type="submit"]');
   submitButton.disabled = true;
+  dashboardMessage.textContent = 'Guardando producto...';
 
   const nombre = document.getElementById('product-name').value;
   const descripcion = document.getElementById('product-description').value;
@@ -293,7 +320,7 @@ productForm.addEventListener('submit', async (event) => {
     const imagenBase64 = await convertirImagenABase64(imageFile);
 
     const nuevoProducto = {
-      id: Date.now(),
+      id: Date.now().toString(),
       nombre,
       descripcion,
       precio,
@@ -301,12 +328,21 @@ productForm.addEventListener('submit', async (event) => {
       imagen: imagenBase64
     };
 
+    const res = await fetch(`${SHEETDB_URL}?sheet=productos`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: [nuevoProducto] })
+    });
+
+    if (!res.ok) throw new Error('Error al guardar el producto');
+
     currentCatalog.productos.push(nuevoProducto);
     productForm.reset();
     renderProducts(currentCatalog.productos);
-    await guardarEnNube();
+    dashboardMessage.textContent = '¡Producto guardado con éxito en Google Sheets!';
   } catch (error) {
-    dashboardMessage.textContent = 'Error al procesar la imagen.';
+    console.error(error);
+    dashboardMessage.textContent = 'Error al guardar el producto.';
   } finally {
     submitButton.disabled = false;
   }
@@ -316,12 +352,12 @@ productList.addEventListener('click', async (event) => {
   const button = event.target.closest('button[data-action]');
   if (!button) return;
 
-  const prodId = Number(button.dataset.id);
-  const product = currentCatalog.productos.find((item) => item.id === prodId);
+  const prodId = String(button.dataset.id);
+  const product = currentCatalog.productos.find((item) => String(item.id) === prodId);
   if (!product) return;
 
   if (button.dataset.action === 'edit-product') {
-    document.querySelector('#edit-product-id').value = String(product.id);
+    document.querySelector('#edit-product-id').value = prodId;
     document.querySelector('#edit-product-name').value = product.nombre;
     document.querySelector('#edit-product-description').value = product.descripcion || '';
     document.querySelector('#edit-product-price').value = String(product.precio);
@@ -333,28 +369,57 @@ productList.addEventListener('click', async (event) => {
 
   if (!window.confirm(`¿Eliminar el producto "${product.nombre}"?`)) return;
 
-  currentCatalog.productos = currentCatalog.productos.filter(p => p.id !== prodId);
-  renderProducts(currentCatalog.productos);
-  await guardarEnNube();
+  dashboardMessage.textContent = 'Eliminando producto...';
+  try {
+    const res = await fetch(`${SHEETDB_URL}/id/${prodId}?sheet=productos`, {
+      method: 'DELETE'
+    });
+
+    if (!res.ok) throw new Error('Error al eliminar');
+
+    currentCatalog.productos = currentCatalog.productos.filter(p => String(p.id) !== prodId);
+    renderProducts(currentCatalog.productos);
+    dashboardMessage.textContent = 'Producto eliminado con éxito.';
+  } catch (e) {
+    console.error(e);
+    dashboardMessage.textContent = 'Error al eliminar producto.';
+  }
 });
 
 editProductForm.addEventListener('submit', async (event) => {
   event.preventDefault();
-  const prodId = Number(document.querySelector('#edit-product-id').value);
+  const prodId = String(document.querySelector('#edit-product-id').value);
   const nombre = document.querySelector('#edit-product-name').value;
   const descripcion = document.querySelector('#edit-product-description').value;
   const precio = parseFloat(document.querySelector('#edit-product-price').value);
   const categoria = editProductCategory.value;
   const imageFile = document.querySelector('#edit-product-image').files[0];
 
-  const product = currentCatalog.productos.find(p => p.id === prodId);
+  const product = currentCatalog.productos.find(p => String(p.id) === prodId);
   if (!product) return;
 
+  dashboardMessage.textContent = 'Actualizando producto...';
   try {
     let imagenBase64 = product.imagen;
     if (imageFile) {
       imagenBase64 = await convertirImagenABase64(imageFile);
     }
+
+    const datosActualizados = {
+      nombre,
+      descripcion,
+      precio,
+      categoria,
+      imagen: imagenBase64
+    };
+
+    const res = await fetch(`${SHEETDB_URL}/id/${prodId}?sheet=productos`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: datosActualizados })
+    });
+
+    if (!res.ok) throw new Error('Error al actualizar');
 
     product.nombre = nombre;
     product.descripcion = descripcion;
@@ -364,8 +429,9 @@ editProductForm.addEventListener('submit', async (event) => {
 
     editProductDialog.close();
     renderProducts(currentCatalog.productos);
-    await guardarEnNube();
+    dashboardMessage.textContent = 'Producto actualizado con éxito.';
   } catch (error) {
+    console.error(error);
     dashboardMessage.textContent = 'Error al actualizar el producto.';
   }
 });
