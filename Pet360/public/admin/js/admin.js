@@ -1,10 +1,3 @@
-// Credenciales de acceso directo para el administrador
-const ADMIN_USER = "pet360admin";
-const ADMIN_PASS = "admin123";
-
-const STORAGE_KEY = 'productos_pet360';
-const CATEGORIES_KEY = 'categorias_pet360';
-
 const adminPage = document.querySelector('.admin-page');
 const loginCard = document.querySelector('#login-card');
 const adminIllustration = document.querySelector('#admin-illustration');
@@ -34,18 +27,24 @@ const editCategoryPlaceholder = editProductCategory.querySelector('option').clon
 let currentCatalog = { categorias: [], productos: [] };
 
 document.addEventListener('DOMContentLoaded', () => {
-  verificarSesion();
-});
+  fetch('/api/admin/session')
+    .then(readResponse)
+    .then(async (result) => {
+      if (!result.authenticated) {
+        showLogin();
+        return;
+      }
 
-function verificarSesion() {
-  const sesionActiva = sessionStorage.getItem('admin_logged_in');
-  if (sesionActiva === 'true') {
-    showDashboard();
-    loadCatalog();
-  } else {
-    showLogin();
-  }
-}
+      showDashboard();
+      dashboardMessage.textContent = 'Cargando catálogo...';
+      await loadCatalog();
+      dashboardMessage.textContent = 'Puedes administrar tu catálogo.';
+    })
+    .catch((error) => {
+      showLogin();
+      formMessage.textContent = getRequestErrorMessage(error, 'No se pudo verificar la sesión.');
+    });
+});
 
 function showDashboard() {
   adminPage.classList.add('dashboard-active');
@@ -61,30 +60,29 @@ function showLogin() {
   dashboard.hidden = true;
 }
 
-// Cargar catálogo desde localStorage
-function loadCatalog() {
-  const storedProducts = localStorage.getItem(STORAGE_KEY);
-  const storedCategories = localStorage.getItem(CATEGORIES_KEY);
+async function readResponse(response) {
+  const result = await response.json().catch(() => ({}));
 
-  let productos = storedProducts ? JSON.parse(storedProducts) : [
-    { id: 1, nombre: 'Alimento Perros 5kg', precio: 18.00, categoria: 'Alimento', descripcion: 'Alimento premium formulado para perros adultos...', imagen: 'https://images.unsplash.com/photo-1589924691995-400dc9ecc119?w=500' },
-    { id: 2, nombre: 'Juguete Mordedera', precio: 4.50, categoria: 'Accesorios', descripcion: 'Juguete resistente de goma ideal...', imagen: 'https://images.unsplash.com/photo-1535930891776-0c2dfb7fda1a?w=500' }
-  ];
+  if (!response.ok) {
+    throw new Error(result.error || 'No se pudo completar la solicitud.');
+  }
 
-  let categorias = storedCategories ? JSON.parse(storedCategories) : [
-    { id: 1, nombre: 'Alimento' },
-    { id: 2, nombre: 'Accesorios' },
-    { id: 3, nombre: 'Gatos' }
-  ];
-
-  currentCatalog = { categorias, productos };
-  renderCategories(categorias);
-  renderProducts(productos, categorias);
+  return result;
 }
 
-function guardarEnStorage() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(currentCatalog.productos));
-  localStorage.setItem(CATEGORIES_KEY, JSON.stringify(currentCatalog.categorias));
+function getRequestErrorMessage(error, fallback) {
+  if (error instanceof TypeError) {
+    return 'No se pudo conectar con el servidor. Inicia Pet360 y abre el panel desde http://localhost:3000/admin/.';
+  }
+
+  return error.message || fallback;
+}
+
+async function loadCatalog() {
+  const response = await fetch('/api/catalogo', { cache: 'no-store' });
+  currentCatalog = await readResponse(response);
+  renderCategories(currentCatalog.categorias);
+  renderProducts(currentCatalog.productos, currentCatalog.categorias);
 }
 
 function renderCategories(categories) {
@@ -122,7 +120,7 @@ function renderCategories(categories) {
     categoryList.append(item);
 
     const option = document.createElement('option');
-    option.value = category.nombre; // Guardamos el nombre como categoría para que coincida con la vista de cliente
+    option.value = String(category.id);
     option.textContent = category.nombre;
     productCategory.append(option.cloneNode(true));
     editProductCategory.append(option);
@@ -177,47 +175,59 @@ function renderProducts(products, categories) {
   }
 }
 
-// Login directo en el cliente
-loginForm.addEventListener('submit', (event) => {
+loginForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   formMessage.textContent = '';
+  loginButton.disabled = true;
 
   const formData = new FormData(loginForm);
-  const user = formData.get('username');
-  const pass = formData.get('password');
 
-  if (user === ADMIN_USER && pass === ADMIN_PASS) {
-    sessionStorage.setItem('admin_logged_in', 'true');
+  try {
+    const response = await fetch('/api/admin/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: formData.get('username'),
+        password: formData.get('password'),
+      }),
+    });
+
+    await readResponse(response);
     loginForm.reset();
     showDashboard();
     dashboardMessage.textContent = 'Sesión iniciada. Cargando catálogo...';
-    loadCatalog();
+    await loadCatalog();
     dashboardMessage.textContent = 'Sesión iniciada. Puedes administrar tu catálogo.';
-  } else {
-    formMessage.textContent = 'Usuario o contraseña incorrectos.';
+  } catch (error) {
+    formMessage.textContent = getRequestErrorMessage(error, 'No se pudo iniciar sesión. Inténtalo de nuevo.');
+  } finally {
+    loginButton.disabled = false;
   }
 });
 
-// Agregar categoría
-categoryForm.addEventListener('submit', (event) => {
+categoryForm.addEventListener('submit', async (event) => {
   event.preventDefault();
-  const nombreCat = categoryInput.value.trim();
-  if (!nombreCat) return;
+  const submitButton = categoryForm.querySelector('button[type="submit"]');
+  submitButton.disabled = true;
 
-  const nuevaCat = {
-    id: Date.now(),
-    nombre: nombreCat
-  };
-
-  currentCatalog.categorias.push(nuevaCat);
-  guardarEnStorage();
-  categoryForm.reset();
-  loadCatalog();
-  dashboardMessage.textContent = `Categoría "${nombreCat}" agregada.`;
+  try {
+    const response = await fetch('/api/categorias', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nombre: categoryInput.value }),
+    });
+    const category = await readResponse(response);
+    categoryForm.reset();
+    await loadCatalog();
+    dashboardMessage.textContent = `Categoría "${category.nombre}" agregada.`;
+  } catch (error) {
+    dashboardMessage.textContent = getRequestErrorMessage(error, 'No se pudo agregar la categoría.');
+  } finally {
+    submitButton.disabled = false;
+  }
 });
 
-// Gestionar Acciones en Categorías (Editar / Eliminar)
-categoryList.addEventListener('click', (event) => {
+categoryList.addEventListener('click', async (event) => {
   const button = event.target.closest('button[data-action]');
   if (!button) return;
 
@@ -235,79 +245,64 @@ categoryList.addEventListener('click', (event) => {
 
   if (!window.confirm(`¿Eliminar la categoría "${category.nombre}"?`)) return;
 
-  currentCatalog.categorias = currentCatalog.categorias.filter(c => c.id !== catId);
-  guardarEnStorage();
-  loadCatalog();
-  dashboardMessage.textContent = `Categoría "${category.nombre}" eliminada.`;
-});
-
-editCategoryForm.addEventListener('submit', (event) => {
-  event.preventDefault();
-  const catId = Number(editCategoryId.value);
-  const nuevoNombre = editCategoryName.value.trim();
-
-  const cat = currentCatalog.categorias.find(c => c.id === catId);
-  if (cat) {
-    cat.nombre = nuevoNombre;
-    guardarEnStorage();
-    editCategoryDialog.close();
-    loadCatalog();
-    dashboardMessage.textContent = `Categoría actualizada con éxito.`;
+  button.disabled = true;
+  try {
+    const response = await fetch(`/api/categorias/${catId}`, { method: 'DELETE' });
+    await readResponse(response);
+    await loadCatalog();
+    dashboardMessage.textContent = `Categoría "${category.nombre}" eliminada.`;
+  } catch (error) {
+    dashboardMessage.textContent = getRequestErrorMessage(error, 'No se pudo eliminar la categoría.');
+  } finally {
+    button.disabled = false;
   }
 });
 
-// Función auxiliar para convertir archivo de imagen a Base64
-function convertirImagenABase64(file) {
-  return new Promise((resolve, reject) => {
-    if (!file) {
-      resolve('https://via.placeholder.com/240x170');
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = error => reject(error);
-    reader.readAsDataURL(file);
-  });
-}
-
-// Agregar producto
-productForm.addEventListener('submit', async (event) => {
+editCategoryForm.addEventListener('submit', async (event) => {
   event.preventDefault();
-  const submitButton = productForm.querySelector('button[type="submit"]');
+  const submitButton = editCategoryForm.querySelector('button[type="submit"]');
   submitButton.disabled = true;
 
-  const nombre = document.getElementById('product-name').value;
-  const descripcion = document.getElementById('product-description').value;
-  const precio = parseFloat(document.getElementById('product-price').value);
-  const categoria = productCategory.value;
-  const imageFile = document.getElementById('product-image').files[0];
-
   try {
-    const imagenBase64 = await convertirImagenABase64(imageFile);
-
-    const nuevoProducto = {
-      id: Date.now(),
-      nombre,
-      descripcion,
-      precio,
-      categoria,
-      imagen: imagenBase64
-    };
-
-    currentCatalog.productos.push(nuevoProducto);
-    guardarEnStorage();
-    productForm.reset();
-    loadCatalog();
-    dashboardMessage.textContent = `Producto "${nombre}" agregado correctamente.`;
+    const response = await fetch(`/api/categorias/${editCategoryId.value}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nombre: editCategoryName.value }),
+    });
+    const category = await readResponse(response);
+    editCategoryDialog.close();
+    await loadCatalog();
+    dashboardMessage.textContent = `Categoría "${category.nombre}" actualizada.`;
   } catch (error) {
-    dashboardMessage.textContent = 'Error al procesar la imagen.';
+    dashboardMessage.textContent = getRequestErrorMessage(error, 'No se pudo actualizar la categoría.');
   } finally {
     submitButton.disabled = false;
   }
 });
 
-// Gestionar Acciones en Productos (Editar / Eliminar)
-productList.addEventListener('click', (event) => {
+productForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const submitButton = productForm.querySelector('button[type="submit"]');
+  submitButton.disabled = true;
+  dashboardMessage.textContent = '';
+
+  try {
+    const response = await fetch('/api/productos', {
+      method: 'POST',
+      body: new FormData(productForm),
+    });
+    const product = await readResponse(response);
+    productForm.reset();
+    await loadCatalog();
+    dashboardMessage.textContent = `Producto "${product.nombre}" agregado correctamente.`;
+  } catch (error) {
+    dashboardMessage.textContent = getRequestErrorMessage(error, 'No se pudo agregar el producto.');
+  } finally {
+    submitButton.disabled = false;
+  }
+});
+
+productList.addEventListener('click', async (event) => {
   const button = event.target.closest('button[data-action]');
   if (!button) return;
 
@@ -320,7 +315,7 @@ productList.addEventListener('click', (event) => {
     document.querySelector('#edit-product-name').value = product.nombre;
     document.querySelector('#edit-product-description').value = product.descripcion || '';
     document.querySelector('#edit-product-price').value = String(product.precio);
-    editProductCategory.value = product.categoria;
+    editProductCategory.value = String(product.categoriaId);
     document.querySelector('#edit-product-image').value = '';
     editProductDialog.showModal();
     document.querySelector('#edit-product-name').focus();
@@ -329,42 +324,37 @@ productList.addEventListener('click', (event) => {
 
   if (!window.confirm(`¿Eliminar el producto "${product.nombre}"?`)) return;
 
-  currentCatalog.productos = currentCatalog.productos.filter(p => p.id !== prodId);
-  guardarEnStorage();
-  loadCatalog();
-  dashboardMessage.textContent = `Producto "${product.nombre}" eliminado.`;
+  button.disabled = true;
+  try {
+    const response = await fetch(`/api/productos/${prodId}`, { method: 'DELETE' });
+    const result = await readResponse(response);
+    await loadCatalog();
+    dashboardMessage.textContent = result.warning || `Producto "${product.nombre}" eliminado.`;
+  } catch (error) {
+    dashboardMessage.textContent = getRequestErrorMessage(error, 'No se pudo eliminar el producto.');
+  } finally {
+    button.disabled = false;
+  }
 });
 
 editProductForm.addEventListener('submit', async (event) => {
   event.preventDefault();
-  const prodId = Number(document.querySelector('#edit-product-id').value);
-  const nombre = document.querySelector('#edit-product-name').value;
-  const descripcion = document.querySelector('#edit-product-description').value;
-  const precio = parseFloat(document.querySelector('#edit-product-price').value);
-  const categoria = editProductCategory.value;
-  const imageFile = document.querySelector('#edit-product-image').files[0];
-
-  const product = currentCatalog.productos.find(p => p.id === prodId);
-  if (!product) return;
-
+  const productId = document.querySelector('#edit-product-id').value;
+  const submitButton = editProductForm.querySelector('button[type="submit"]');
+  submitButton.disabled = true;
   try {
-    let imagenBase64 = product.imagen;
-    if (imageFile) {
-      imagenBase64 = await convertirImagenABase64(imageFile);
-    }
-
-    product.nombre = nombre;
-    product.descripcion = descripcion;
-    product.precio = precio;
-    product.categoria = categoria;
-    product.imagen = imagenBase64;
-
-    guardarEnStorage();
+    const response = await fetch(`/api/productos/${productId}`, {
+      method: 'PUT',
+      body: new FormData(editProductForm),
+    });
+    const product = await readResponse(response);
     editProductDialog.close();
-    loadCatalog();
-    dashboardMessage.textContent = `Producto "${nombre}" actualizado correctamente.`;
+    await loadCatalog();
+    dashboardMessage.textContent = product.warning || `Producto "${product.nombre}" actualizado correctamente.`;
   } catch (error) {
-    dashboardMessage.textContent = 'Error al actualizar el producto.';
+    dashboardMessage.textContent = getRequestErrorMessage(error, 'No se pudo actualizar el producto.');
+  } finally {
+    submitButton.disabled = false;
   }
 });
 
@@ -374,8 +364,20 @@ document.querySelectorAll('[data-close-dialog]').forEach((button) => {
   });
 });
 
-logoutButton.addEventListener('click', () => {
-  sessionStorage.removeItem('admin_logged_in');
-  showLogin();
-  dashboardMessage.textContent = '';
+logoutButton.addEventListener('click', async () => {
+  logoutButton.disabled = true;
+
+  try {
+    const response = await fetch('/api/admin/logout', { method: 'POST' });
+    if (!response.ok) {
+      throw new Error('No se pudo cerrar sesión. Inténtalo de nuevo.');
+    }
+
+    showLogin();
+    dashboardMessage.textContent = '';
+  } catch (error) {
+    dashboardMessage.textContent = getRequestErrorMessage(error, 'No se pudo cerrar sesión.');
+  } finally {
+    logoutButton.disabled = false;
+  }
 });
