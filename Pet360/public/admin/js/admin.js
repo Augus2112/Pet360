@@ -1,3 +1,10 @@
+// Credenciales de acceso directo para el administrador
+const ADMIN_USER = "pet360admin";
+const ADMIN_PASS = "admin123";
+
+const STORAGE_KEY = 'productos_pet360';
+const CATEGORIES_KEY = 'categorias_pet360';
+
 const adminPage = document.querySelector('.admin-page');
 const loginCard = document.querySelector('#login-card');
 const adminIllustration = document.querySelector('#admin-illustration');
@@ -23,7 +30,22 @@ const editProductForm = document.querySelector('#edit-product-form');
 const editProductCategory = document.querySelector('#edit-product-category');
 const categoryPlaceholder = productCategory.querySelector('option').cloneNode(true);
 const editCategoryPlaceholder = editProductCategory.querySelector('option').cloneNode(true);
+
 let currentCatalog = { categorias: [], productos: [] };
+
+document.addEventListener('DOMContentLoaded', () => {
+  verificarSesion();
+});
+
+function verificarSesion() {
+  const sesionActiva = sessionStorage.getItem('admin_logged_in');
+  if (sesionActiva === 'true') {
+    showDashboard();
+    loadCatalog();
+  } else {
+    showLogin();
+  }
+}
 
 function showDashboard() {
   adminPage.classList.add('dashboard-active');
@@ -39,33 +61,30 @@ function showLogin() {
   dashboard.hidden = true;
 }
 
-async function readResponse(response) {
-  const result = await response.json().catch(() => ({}));
+// Cargar catálogo desde localStorage
+function loadCatalog() {
+  const storedProducts = localStorage.getItem(STORAGE_KEY);
+  const storedCategories = localStorage.getItem(CATEGORIES_KEY);
 
-  if (!response.ok) {
-    throw new Error(result.error || 'No se pudo completar la solicitud.');
-  }
+  let productos = storedProducts ? JSON.parse(storedProducts) : [
+    { id: 1, nombre: 'Alimento Perros 5kg', precio: 18.00, categoria: 'Alimento', descripcion: 'Alimento premium formulado para perros adultos...', imagen: 'https://images.unsplash.com/photo-1589924691995-400dc9ecc119?w=500' },
+    { id: 2, nombre: 'Juguete Mordedera', precio: 4.50, categoria: 'Accesorios', descripcion: 'Juguete resistente de goma ideal...', imagen: 'https://images.unsplash.com/photo-1535930891776-0c2dfb7fda1a?w=500' }
+  ];
 
-  return result;
+  let categorias = storedCategories ? JSON.parse(storedCategories) : [
+    { id: 1, nombre: 'Alimento' },
+    { id: 2, nombre: 'Accesorios' },
+    { id: 3, nombre: 'Gatos' }
+  ];
+
+  currentCatalog = { categorias, productos };
+  renderCategories(categorias);
+  renderProducts(productos, categorias);
 }
 
-function getRequestErrorMessage(error, fallback) {
-  if (location.protocol === 'file:') {
-    return 'Abre el panel desde http://localhost:3000/admin/ y ejecuta "npm start" dentro de la carpeta Pet360.';
-  }
-
-  if (error instanceof TypeError) {
-    return 'No se pudo conectar con el servidor. Ejecuta "npm start" dentro de la carpeta Pet360 y vuelve a abrir http://localhost:3000/admin/.';
-  }
-
-  return error.message || fallback;
-}
-
-async function loadCatalog() {
-  const response = await fetch('/api/catalogo');
-  currentCatalog = await readResponse(response);
-  renderCategories(currentCatalog.categorias);
-  renderProducts(currentCatalog.productos, currentCatalog.categorias);
+function guardarEnStorage() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(currentCatalog.productos));
+  localStorage.setItem(CATEGORIES_KEY, JSON.stringify(currentCatalog.categorias));
 }
 
 function renderCategories(categories) {
@@ -103,7 +122,7 @@ function renderCategories(categories) {
     categoryList.append(item);
 
     const option = document.createElement('option');
-    option.value = String(category.id);
+    option.value = category.nombre; // Guardamos el nombre como categoría para que coincida con la vista de cliente
     option.textContent = category.nombre;
     productCategory.append(option.cloneNode(true));
     editProductCategory.append(option);
@@ -119,7 +138,7 @@ function renderProducts(products, categories) {
     item.className = 'product-item';
 
     const image = document.createElement('img');
-    image.src = product.imagen;
+    image.src = product.imagen || 'https://via.placeholder.com/240x170';
     image.alt = product.nombre;
     image.loading = 'lazy';
 
@@ -129,9 +148,8 @@ function renderProducts(products, categories) {
     const name = document.createElement('h3');
     name.textContent = product.nombre;
 
-    const category = categories.find((entry) => entry.id === product.categoriaId);
     const categoryName = document.createElement('p');
-    categoryName.textContent = category ? category.nombre : 'Sin categoría';
+    categoryName.textContent = product.categoria ? `Categoría: ${product.categoria}` : 'Sin categoría';
 
     const price = document.createElement('p');
     price.className = 'product-price';
@@ -159,73 +177,53 @@ function renderProducts(products, categories) {
   }
 }
 
-loginForm.addEventListener('submit', async (event) => {
+// Login directo en el cliente
+loginForm.addEventListener('submit', (event) => {
   event.preventDefault();
   formMessage.textContent = '';
-  loginButton.disabled = true;
 
   const formData = new FormData(loginForm);
+  const user = formData.get('username');
+  const pass = formData.get('password');
 
-  try {
-    const response = await fetch('/api/admin/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        username: formData.get('username'),
-        password: formData.get('password'),
-      }),
-    });
-
-    await readResponse(response);
+  if (user === ADMIN_USER && pass === ADMIN_PASS) {
+    sessionStorage.setItem('admin_logged_in', 'true');
     loginForm.reset();
     showDashboard();
     dashboardMessage.textContent = 'Sesión iniciada. Cargando catálogo...';
-    await loadCatalog();
+    loadCatalog();
     dashboardMessage.textContent = 'Sesión iniciada. Puedes administrar tu catálogo.';
-  } catch (error) {
-    if (dashboard.hidden) {
-      formMessage.textContent = getRequestErrorMessage(error, 'No se pudo iniciar sesión. Inténtalo de nuevo.');
-    } else {
-      dashboardMessage.textContent = getRequestErrorMessage(error, 'No se pudo cargar el catálogo.');
-    }
-  } finally {
-    loginButton.disabled = false;
+  } else {
+    formMessage.textContent = 'Usuario o contraseña incorrectos.';
   }
 });
 
-categoryForm.addEventListener('submit', async (event) => {
+// Agregar categoría
+categoryForm.addEventListener('submit', (event) => {
   event.preventDefault();
-  const submitButton = categoryForm.querySelector('button[type="submit"]');
-  submitButton.disabled = true;
-  dashboardMessage.textContent = '';
+  const nombreCat = categoryInput.value.trim();
+  if (!nombreCat) return;
 
-  try {
-    const response = await fetch('/api/categorias', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nombre: categoryInput.value }),
-    });
-    const category = await readResponse(response);
-    categoryForm.reset();
-    await loadCatalog();
-    dashboardMessage.textContent = `Categoría "${category.nombre}" agregada.`;
-  } catch (error) {
-    dashboardMessage.textContent = error.message || 'No se pudo agregar la categoría.';
-  } finally {
-    submitButton.disabled = false;
-  }
+  const nuevaCat = {
+    id: Date.now(),
+    nombre: nombreCat
+  };
+
+  currentCatalog.categorias.push(nuevaCat);
+  guardarEnStorage();
+  categoryForm.reset();
+  loadCatalog();
+  dashboardMessage.textContent = `Categoría "${nombreCat}" agregada.`;
 });
 
-categoryList.addEventListener('click', async (event) => {
+// Gestionar Acciones en Categorías (Editar / Eliminar)
+categoryList.addEventListener('click', (event) => {
   const button = event.target.closest('button[data-action]');
-  if (!button) {
-    return;
-  }
+  if (!button) return;
 
-  const category = currentCatalog.categorias.find((item) => item.id === Number(button.dataset.id));
-  if (!category) {
-    return;
-  }
+  const catId = Number(button.dataset.id);
+  const category = currentCatalog.categorias.find((item) => item.id === catId);
+  if (!category) return;
 
   if (button.dataset.action === 'edit-category') {
     editCategoryId.value = String(category.id);
@@ -235,126 +233,138 @@ categoryList.addEventListener('click', async (event) => {
     return;
   }
 
-  if (!window.confirm(`¿Eliminar la categoría "${category.nombre}"?`)) {
-    return;
-  }
+  if (!window.confirm(`¿Eliminar la categoría "${category.nombre}"?`)) return;
 
-  button.disabled = true;
-  try {
-    const response = await fetch(`/api/categorias/${category.id}`, { method: 'DELETE' });
-    await readResponse(response);
-    await loadCatalog();
-    dashboardMessage.textContent = `Categoría "${category.nombre}" eliminada.`;
-  } catch (error) {
-    dashboardMessage.textContent = error.message || 'No se pudo eliminar la categoría.';
-  } finally {
-    button.disabled = false;
-  }
+  currentCatalog.categorias = currentCatalog.categorias.filter(c => c.id !== catId);
+  guardarEnStorage();
+  loadCatalog();
+  dashboardMessage.textContent = `Categoría "${category.nombre}" eliminada.`;
 });
 
-editCategoryForm.addEventListener('submit', async (event) => {
+editCategoryForm.addEventListener('submit', (event) => {
   event.preventDefault();
-  const submitButton = editCategoryForm.querySelector('button[type="submit"]');
-  submitButton.disabled = true;
+  const catId = Number(editCategoryId.value);
+  const nuevoNombre = editCategoryName.value.trim();
 
-  try {
-    const response = await fetch(`/api/categorias/${editCategoryId.value}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nombre: editCategoryName.value }),
-    });
-    const category = await readResponse(response);
+  const cat = currentCatalog.categorias.find(c => c.id === catId);
+  if (cat) {
+    cat.nombre = nuevoNombre;
+    guardarEnStorage();
     editCategoryDialog.close();
-    await loadCatalog();
-    dashboardMessage.textContent = `Categoría "${category.nombre}" actualizada.`;
-  } catch (error) {
-    dashboardMessage.textContent = error.message || 'No se pudo actualizar la categoría.';
-  } finally {
-    submitButton.disabled = false;
+    loadCatalog();
+    dashboardMessage.textContent = `Categoría actualizada con éxito.`;
   }
 });
 
+// Función auxiliar para convertir archivo de imagen a Base64
+function convertirImagenABase64(file) {
+  return new Promise((resolve, reject) => {
+    if (!file) {
+      resolve('https://via.placeholder.com/240x170');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = error => reject(error);
+    reader.readAsDataURL(file);
+  });
+}
+
+// Agregar producto
 productForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   const submitButton = productForm.querySelector('button[type="submit"]');
   submitButton.disabled = true;
-  dashboardMessage.textContent = '';
+
+  const nombre = document.getElementById('product-name').value;
+  const descripcion = document.getElementById('product-description').value;
+  const precio = parseFloat(document.getElementById('product-price').value);
+  const categoria = productCategory.value;
+  const imageFile = document.getElementById('product-image').files[0];
 
   try {
-    const response = await fetch('/api/productos', {
-      method: 'POST',
-      body: new FormData(productForm),
-    });
-    const product = await readResponse(response);
+    const imagenBase64 = await convertirImagenABase64(imageFile);
+
+    const nuevoProducto = {
+      id: Date.now(),
+      nombre,
+      descripcion,
+      precio,
+      categoria,
+      imagen: imagenBase64
+    };
+
+    currentCatalog.productos.push(nuevoProducto);
+    guardarEnStorage();
     productForm.reset();
-    await loadCatalog();
-    dashboardMessage.textContent = `Producto "${product.nombre}" agregado.`;
+    loadCatalog();
+    dashboardMessage.textContent = `Producto "${nombre}" agregado correctamente.`;
   } catch (error) {
-    dashboardMessage.textContent = error.message || 'No se pudo agregar el producto.';
+    dashboardMessage.textContent = 'Error al procesar la imagen.';
   } finally {
     submitButton.disabled = false;
   }
 });
 
-productList.addEventListener('click', async (event) => {
+// Gestionar Acciones en Productos (Editar / Eliminar)
+productList.addEventListener('click', (event) => {
   const button = event.target.closest('button[data-action]');
-  if (!button) {
-    return;
-  }
+  if (!button) return;
 
-  const product = currentCatalog.productos.find((item) => item.id === Number(button.dataset.id));
-  if (!product) {
-    return;
-  }
+  const prodId = Number(button.dataset.id);
+  const product = currentCatalog.productos.find((item) => item.id === prodId);
+  if (!product) return;
 
   if (button.dataset.action === 'edit-product') {
     document.querySelector('#edit-product-id').value = String(product.id);
     document.querySelector('#edit-product-name').value = product.nombre;
-    document.querySelector('#edit-product-description').value = product.descripcion;
+    document.querySelector('#edit-product-description').value = product.descripcion || '';
     document.querySelector('#edit-product-price').value = String(product.precio);
-    editProductCategory.value = String(product.categoriaId);
+    editProductCategory.value = product.categoria;
     document.querySelector('#edit-product-image').value = '';
     editProductDialog.showModal();
     document.querySelector('#edit-product-name').focus();
     return;
   }
 
-  if (!window.confirm(`¿Eliminar el producto "${product.nombre}"?`)) {
-    return;
-  }
+  if (!window.confirm(`¿Eliminar el producto "${product.nombre}"?`)) return;
 
-  button.disabled = true;
-  try {
-    const response = await fetch(`/api/productos/${product.id}`, { method: 'DELETE' });
-    const result = await readResponse(response);
-    await loadCatalog();
-    dashboardMessage.textContent = result.warning || `Producto "${product.nombre}" eliminado.`;
-  } catch (error) {
-    dashboardMessage.textContent = error.message || 'No se pudo eliminar el producto.';
-  } finally {
-    button.disabled = false;
-  }
+  currentCatalog.productos = currentCatalog.productos.filter(p => p.id !== prodId);
+  guardarEnStorage();
+  loadCatalog();
+  dashboardMessage.textContent = `Producto "${product.nombre}" eliminado.`;
 });
 
 editProductForm.addEventListener('submit', async (event) => {
   event.preventDefault();
-  const productId = document.querySelector('#edit-product-id').value;
-  const submitButton = editProductForm.querySelector('button[type="submit"]');
-  submitButton.disabled = true;
+  const prodId = Number(document.querySelector('#edit-product-id').value);
+  const nombre = document.querySelector('#edit-product-name').value;
+  const descripcion = document.querySelector('#edit-product-description').value;
+  const precio = parseFloat(document.querySelector('#edit-product-price').value);
+  const categoria = editProductCategory.value;
+  const imageFile = document.querySelector('#edit-product-image').files[0];
+
+  const product = currentCatalog.productos.find(p => p.id === prodId);
+  if (!product) return;
 
   try {
-    const response = await fetch(`/api/productos/${productId}`, {
-      method: 'PUT',
-      body: new FormData(editProductForm),
-    });
-    const product = await readResponse(response);
+    let imagenBase64 = product.imagen;
+    if (imageFile) {
+      imagenBase64 = await convertirImagenABase64(imageFile);
+    }
+
+    product.nombre = nombre;
+    product.descripcion = descripcion;
+    product.precio = precio;
+    product.categoria = categoria;
+    product.imagen = imagenBase64;
+
+    guardarEnStorage();
     editProductDialog.close();
-    await loadCatalog();
-    dashboardMessage.textContent = product.warning || `Producto "${product.nombre}" actualizado.`;
+    loadCatalog();
+    dashboardMessage.textContent = `Producto "${nombre}" actualizado correctamente.`;
   } catch (error) {
-    dashboardMessage.textContent = error.message || 'No se pudo actualizar el producto.';
-  } finally {
-    submitButton.disabled = false;
+    dashboardMessage.textContent = 'Error al actualizar el producto.';
   }
 });
 
@@ -364,35 +374,8 @@ document.querySelectorAll('[data-close-dialog]').forEach((button) => {
   });
 });
 
-logoutButton.addEventListener('click', async () => {
-  logoutButton.disabled = true;
-
-  try {
-    const response = await fetch('/api/admin/logout', { method: 'POST' });
-
-    if (!response.ok) {
-      throw new Error('No se pudo cerrar sesión. Inténtalo de nuevo.');
-    }
-
-    showLogin();
-    dashboardMessage.textContent = '';
-  } catch (error) {
-    dashboardMessage.textContent = error.message || 'No se pudo conectar con el servidor.';
-  } finally {
-    logoutButton.disabled = false;
-  }
+logoutButton.addEventListener('click', () => {
+  sessionStorage.removeItem('admin_logged_in');
+  showLogin();
+  dashboardMessage.textContent = '';
 });
-
-fetch('/api/admin/session')
-  .then(readResponse)
-  .then(async (result) => {
-    if (result.authenticated) {
-      showDashboard();
-      dashboardMessage.textContent = 'Cargando catálogo...';
-      await loadCatalog();
-      dashboardMessage.textContent = 'Puedes administrar tu catálogo.';
-    }
-  })
-  .catch((error) => {
-    formMessage.textContent = error.message || 'No se pudo verificar la sesión con el servidor.';
-  });
