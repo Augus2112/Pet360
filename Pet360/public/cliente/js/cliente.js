@@ -1,5 +1,8 @@
+// Configuración de JSONBin
+const BIN_ID = '6af3e690ffd5d16053b85a92';
+const API_KEY = '$2a$10$OnZ5OXF8hEQN4S6BEcNDTO2v3SzWKV1CDFQ1.yjYaYAOYB5kZWhd6'; // Reemplaza por tu Master Key de la pestaña API KEYS
+
 let productos = [];
-let categorias = [];
 let carrito = [];
 let categoriaActual = 'todos';
 let toastTimeout;
@@ -30,58 +33,43 @@ const modalProductCategory = document.getElementById('modalProductCategory');
 const modalProductPrice = document.getElementById('modalProductPrice');
 const modalProductDesc = document.getElementById('modalProductDesc');
 
-// Inicializar la aplicación al cargar la página
 document.addEventListener('DOMContentLoaded', () => {
     cargarProductos();
     configurarEventos();
 });
 
 async function cargarProductos() {
-    productsGrid.innerHTML = '<p style="grid-column: 1/-1; text-align: center; color: #64748b; padding: 2rem;">Cargando catálogo...</p>';
-
     try {
-        const response = await fetch('/api/catalogo', { cache: 'no-store' });
-        if (!response.ok) {
-            throw new Error('No se pudo cargar el catálogo.');
-        }
+        productsGrid.innerHTML = `<p style="grid-column: 1/-1; text-align: center; color: #64748b; padding: 2rem;">Cargando productos...</p>`;
+        
+        const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
+            headers: { 'X-Master-Key': API_KEY }
+        });
 
-        const catalogo = await response.json();
-        if (!Array.isArray(catalogo.categorias) || !Array.isArray(catalogo.productos)) {
-            throw new Error('El catálogo tiene un formato no válido.');
-        }
+        if (!res.ok) throw new Error('Error al obtener datos');
 
-        categorias = catalogo.categorias;
-        const nombresCategorias = new Map(categorias.map(categoria => [categoria.id, categoria.nombre]));
-        productos = catalogo.productos.map(producto => ({
-            ...producto,
-            categoria: nombresCategorias.get(producto.categoriaId) || 'Sin categoría'
-        }));
-
+        const data = await res.json();
+        productos = data.record.productos || [];
+        
         renderizarCategorias();
         filtrarYMostrarProductos();
-    } catch (error) {
-        productos = [];
-        categorias = [];
-        renderizarCategorias();
-        productsGrid.innerHTML = `<p style="grid-column: 1/-1; text-align: center; color: #64748b; padding: 2rem;">${escapeHTML(error.message || 'No se pudo conectar con el catálogo.')}</p>`;
+    } catch (e) {
+        console.error(e);
+        productsGrid.innerHTML = `<p style="grid-column: 1/-1; text-align: center; color: #ef4444; padding: 2rem;">No se pudieron cargar los productos.</p>`;
     }
 }
 
 function renderizarCategorias() {
+    const categorias = ['todos', ...new Set(productos.map(p => p.categoria || 'Sin categoría'))];
     categoryFilters.innerHTML = '';
-
-    const filtros = [
-        { id: 'todos', nombre: 'Todos' },
-        ...categorias.map(categoria => ({ id: String(categoria.id), nombre: categoria.nombre }))
-    ];
-
-    filtros.forEach(cat => {
+    
+    categorias.forEach(cat => {
         const btn = document.createElement('button');
-        btn.className = `btn-filter ${cat.id === categoriaActual ? 'active' : ''}`;
-        btn.textContent = cat.nombre;
-        btn.dataset.category = cat.id;
+        btn.className = `btn-filter ${cat === categoriaActual ? 'active' : ''}`;
+        btn.textContent = cat.charAt(0).toUpperCase() + cat.slice(1);
+        btn.dataset.category = cat;
         btn.addEventListener('click', () => {
-            categoriaActual = cat.id;
+            categoriaActual = cat;
             document.querySelectorAll('.btn-filter').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             filtrarYMostrarProductos();
@@ -91,10 +79,11 @@ function renderizarCategorias() {
 }
 
 function filtrarYMostrarProductos() {
-    const textoBusqueda = searchInput.value.toLowerCase().trim();
+    const textoBusqueda = searchInput ? searchInput.value.toLowerCase().trim() : '';
     
     const filtrados = productos.filter(p => {
-        const coincideCategoria = categoriaActual === 'todos' || String(p.categoriaId) === categoriaActual;
+        const catProducto = p.categoria || 'Sin categoría';
+        const coincideCategoria = categoriaActual === 'todos' || catProducto.toLowerCase() === categoriaActual.toLowerCase();
         const coincideTexto = p.nombre.toLowerCase().includes(textoBusqueda);
         return coincideCategoria && coincideTexto;
     });
@@ -105,7 +94,7 @@ function filtrarYMostrarProductos() {
 function renderizarProductos(lista) {
     productsGrid.innerHTML = '';
     if (lista.length === 0) {
-        productsGrid.innerHTML = `<p style="grid-column: 1/-1; text-align: center; color: #64748b; padding: 2rem;">No se encontraron productos.</p>`;
+        productsGrid.innerHTML = `<p style="grid-column: 1/-1; text-align: center; color: #64748b; padding: 2rem;">No hay productos disponibles.</p>`;
         return;
     }
 
@@ -113,21 +102,21 @@ function renderizarProductos(lista) {
         const card = document.createElement('div');
         card.className = 'product-card';
         card.innerHTML = `
-            <div class="product-img-container" data-id="${escapeHTML(producto.id)}">
-                <img src="${escapeHTML(producto.imagen || 'https://via.placeholder.com/240x170')}" alt="${escapeHTML(producto.nombre)}" class="product-img">
+            <div class="product-img-container" data-id="${producto.id}">
+                <img src="${producto.imagen || 'https://via.placeholder.com/240x170'}" alt="${producto.nombre}" class="product-img">
             </div>
             <div class="product-info">
-                <h3 class="product-title" data-id="${escapeHTML(producto.id)}">${escapeHTML(producto.nombre)}</h3>
-                <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 0.4rem;">Categoría: ${escapeHTML(producto.categoria)}</p>
+                <h3 class="product-title" data-id="${producto.id}">${producto.nombre}</h3>
+                <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 0.4rem;">Categoría: ${producto.categoria || 'Sin categoría'}</p>
                 <div class="product-price">$${Number(producto.precio).toFixed(2)}</div>
                 
                 <div class="product-actions-card">
                     <div class="qty-selector">
-                        <button type="button" class="btn-qty minus" data-id="${escapeHTML(producto.id)}">-</button>
-                        <input type="number" id="qty-${escapeHTML(producto.id)}" class="input-qty" value="1" min="1" max="99">
-                        <button type="button" class="btn-qty plus" data-id="${escapeHTML(producto.id)}">+</button>
+                        <button type="button" class="btn-qty minus" data-id="${producto.id}">-</button>
+                        <input type="number" id="qty-${producto.id}" class="input-qty" value="1" min="1" max="99">
+                        <button type="button" class="btn-qty plus" data-id="${producto.id}">+</button>
                     </div>
-                    <button class="btn-add-cart" data-id="${escapeHTML(producto.id)}">Agregar</button>
+                    <button class="btn-add-cart" data-id="${producto.id}">Agregar</button>
                 </div>
             </div>
         `;
@@ -172,9 +161,9 @@ function abrirDetalleProducto(id) {
     modalProductImg.src = producto.imagen || 'https://via.placeholder.com/400x300';
     modalProductImg.alt = producto.nombre;
     modalProductTitle.textContent = producto.nombre;
-    modalProductCategory.textContent = `Categoría: ${producto.categoria}`;
+    modalProductCategory.textContent = `Categoría: ${producto.categoria || 'Sin categoría'}`;
     modalProductPrice.textContent = `$${Number(producto.precio).toFixed(2)}`;
-    modalProductDesc.textContent = producto.descripcion || "Este producto no cuenta con una descripción detallada por el momento.";
+    modalProductDesc.textContent = producto.descripcion || "Este producto no cuenta con una descripción detallada.";
 
     productModal.classList.add('active');
 }
@@ -203,6 +192,7 @@ function agregarAlCarrito(id, cantidad) {
 }
 
 function mostrarNotificacion(mensaje) {
+    if (!toastNotification || !toastMessage) return;
     if (toastTimeout) clearTimeout(toastTimeout);
     
     toastMessage.textContent = mensaje;
@@ -215,12 +205,13 @@ function mostrarNotificacion(mensaje) {
 
 function actualizarCarritoUI() {
     const totalItems = carrito.reduce((sum, item) => sum + item.cantidad, 0);
-    cartBadge.textContent = totalItems;
+    if (cartBadge) cartBadge.textContent = totalItems;
 
+    if (!cartItemsList) return;
     cartItemsList.innerHTML = '';
     if (carrito.length === 0) {
         cartItemsList.innerHTML = `<p style="text-align: center; color: #64748b; padding: 1rem;">Tu carrito está vacío.</p>`;
-        cartTotalText.textContent = `Total: $0.00`;
+        if (cartTotalText) cartTotalText.textContent = `Total: $0.00`;
         return;
     }
 
@@ -229,7 +220,7 @@ function actualizarCarritoUI() {
         div.className = 'cart-item';
         div.innerHTML = `
             <div>
-                <strong>${escapeHTML(item.nombre)}</strong><br>
+                <strong>${item.nombre}</strong><br>
                 <small style="color: #64748b;">$${item.precio.toFixed(2)} x ${item.cantidad}</small>
             </div>
             <div style="display: flex; align-items: center; gap: 0.8rem;">
@@ -241,7 +232,7 @@ function actualizarCarritoUI() {
     });
 
     const total = carrito.reduce((sum, item) => sum + (item.precio * item.cantidad), 0);
-    cartTotalText.textContent = `Total: $${total.toFixed(2)}`;
+    if (cartTotalText) cartTotalText.textContent = `Total: $${total.toFixed(2)}`;
 }
 
 window.eliminarDelCarrito = function(index) {
@@ -249,42 +240,25 @@ window.eliminarDelCarrito = function(index) {
     actualizarCarritoUI();
 };
 
-function escapeHTML(value) {
-    return String(value).replace(/[&<>"']/g, character => ({
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        '"': '&quot;',
-        "'": '&#39;'
-    })[character]);
-}
-
 function configurarEventos() {
-    searchInput.addEventListener('input', filtrarYMostrarProductos);
+    if (searchInput) searchInput.addEventListener('input', filtrarYMostrarProductos);
 
-    openCartBtn.addEventListener('click', () => {
-        cartModal.classList.add('active');
-    });
+    if (openCartBtn) openCartBtn.addEventListener('click', () => cartModal.classList.add('active'));
+    if (closeCartModal) closeCartModal.addEventListener('click', () => cartModal.classList.remove('active'));
 
-    closeCartModal.addEventListener('click', () => {
-        cartModal.classList.remove('active');
-    });
+    if (cartModal) {
+        cartModal.addEventListener('click', (e) => {
+            if (e.target === cartModal) cartModal.classList.remove('active');
+        });
+    }
 
-    cartModal.addEventListener('click', (e) => {
-        if (e.target === cartModal) {
-            cartModal.classList.remove('active');
-        }
-    });
+    if (closeProductModal) closeProductModal.addEventListener('click', () => productModal.classList.remove('active'));
 
-    closeProductModal.addEventListener('click', () => {
-        productModal.classList.remove('active');
-    });
-
-    productModal.addEventListener('click', (e) => {
-        if (e.target === productModal) {
-            productModal.classList.remove('active');
-        }
-    });
+    if (productModal) {
+        productModal.addEventListener('click', (e) => {
+            if (e.target === productModal) productModal.classList.remove('active');
+        });
+    }
 
     if (clientNameInput) {
         clientNameInput.addEventListener('input', (e) => {
@@ -292,35 +266,36 @@ function configurarEventos() {
         });
     }
 
-    checkoutForm.addEventListener('submit', (e) => {
-        e.preventDefault();
-        if (carrito.length === 0) {
-            alert("El carrito está vacío.");
-            return;
-        }
+    if (checkoutForm) {
+        checkoutForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            if (carrito.length === 0) {
+                alert("El carrito está vacío.");
+                return;
+            }
 
-        const nombre = clientNameInput.value.trim();
-        
-        const soloLetrasRegex = /^[A-Za-zÁÉÍÓÚáéíóúÑñ\s]+$/;
-        if (!soloLetrasRegex.test(nombre)) {
-            alert("Por favor, ingresa un nombre válido que contenga solo letras.");
-            return;
-        }
+            const nombre = clientNameInput ? clientNameInput.value.trim() : '';
+            const soloLetrasRegex = /^[A-Za-zÁÉÍÓÚáéíóúÑñ\s]+$/;
+            if (!soloLetrasRegex.test(nombre)) {
+                alert("Por favor, ingresa un nombre válido que contenga solo letras.");
+                return;
+            }
 
-        const telefonoTienda = "584120000000";
+            const telefonoTienda = "584120000000";
 
-        let mensaje = `*NUEVO PEDIDO - PET360*\n\n`;
-        mensaje += `*Cliente:* ${nombre}\n\n`;
-        mensaje += `*Productos:* \n`;
+            let mensaje = `*NUEVO PEDIDO - PET360*\n\n`;
+            mensaje += `*Cliente:* ${nombre}\n\n`;
+            mensaje += `*Productos:* \n`;
 
-        carrito.forEach(item => {
-            mensaje += `- ${item.cantidad}x ${item.nombre} ($${(item.precio * item.cantidad).toFixed(2)})\n`;
+            carrito.forEach(item => {
+                mensaje += `- ${item.cantidad}x ${item.nombre} ($${(item.precio * item.cantidad).toFixed(2)})\n`;
+            });
+
+            const total = carrito.reduce((sum, item) => sum + (item.precio * item.cantidad), 0);
+            mensaje += `\n*Total a pagar: $${total.toFixed(2)}*`;
+
+            const url = `https://wa.me/${telefonoTienda}?text=${encodeURIComponent(mensaje)}`;
+            window.open(url, '_blank');
         });
-
-        const total = carrito.reduce((sum, item) => sum + (item.precio * item.cantidad), 0);
-        mensaje += `\n*Total a pagar: $${total.toFixed(2)}*`;
-
-        const url = `https://wa.me/${telefonoTienda}?text=${encodeURIComponent(mensaje)}`;
-        window.open(url, '_blank');
-    });
+    }
 }

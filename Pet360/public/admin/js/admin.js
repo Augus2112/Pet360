@@ -1,9 +1,10 @@
-// Credenciales de acceso directo para el administrador
+// Credenciales de acceso directo
 const ADMIN_USER = "pet360admin";
 const ADMIN_PASS = "admin123";
 
-const STORAGE_KEY = 'productos_pet360';
-const CATEGORIES_KEY = 'categorias_pet360';
+// Configuración de JSONBin
+const BIN_ID = '6af3e690ffd5d16053b85a92';
+const API_KEY = '$2a$10$OnZ5OXF8hEQN4S6BEcNDTO2v3SzWKV1CDFQ1.yjYaYAOYB5kZWhd6'; // Reemplaza por tu Master Key de la pestaña API KEYS
 
 const adminPage = document.querySelector('.admin-page');
 const loginCard = document.querySelector('#login-card');
@@ -61,30 +62,50 @@ function showLogin() {
   dashboard.hidden = true;
 }
 
-// Cargar catálogo desde localStorage
-function loadCatalog() {
-  const storedProducts = localStorage.getItem(STORAGE_KEY);
-  const storedCategories = localStorage.getItem(CATEGORIES_KEY);
+// Cargar catálogo desde JSONBin
+async function loadCatalog() {
+  dashboardMessage.textContent = 'Cargando catálogo desde la nube...';
+  try {
+    const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
+      headers: { 'X-Master-Key': API_KEY }
+    });
+    
+    if (!res.ok) throw new Error('Error al conectar con la base de datos');
 
-  let productos = storedProducts ? JSON.parse(storedProducts) : [
-    { id: 1, nombre: 'Alimento Perros 5kg', precio: 18.00, categoria: 'Alimento', descripcion: 'Alimento premium formulado para perros adultos...', imagen: 'https://images.unsplash.com/photo-1589924691995-400dc9ecc119?w=500' },
-    { id: 2, nombre: 'Juguete Mordedera', precio: 4.50, categoria: 'Accesorios', descripcion: 'Juguete resistente de goma ideal...', imagen: 'https://images.unsplash.com/photo-1535930891776-0c2dfb7fda1a?w=500' }
-  ];
+    const data = await res.json();
+    currentCatalog.productos = data.record.productos || [];
+    currentCatalog.categorias = data.record.categorias || [
+      { id: 1, nombre: 'Alimento' },
+      { id: 2, nombre: 'Accesorios' },
+      { id: 3, nombre: 'Gatos' }
+    ];
 
-  let categorias = storedCategories ? JSON.parse(storedCategories) : [
-    { id: 1, nombre: 'Alimento' },
-    { id: 2, nombre: 'Accesorios' },
-    { id: 3, nombre: 'Gatos' }
-  ];
-
-  currentCatalog = { categorias, productos };
-  renderCategories(categorias);
-  renderProducts(productos, categorias);
+    renderCategories(currentCatalog.categorias);
+    renderProducts(currentCatalog.productos);
+    dashboardMessage.textContent = 'Catálogo actualizado en tiempo real.';
+  } catch (e) {
+    dashboardMessage.textContent = 'Error al cargar catálogo desde la nube.';
+  }
 }
 
-function guardarEnStorage() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(currentCatalog.productos));
-  localStorage.setItem(CATEGORIES_KEY, JSON.stringify(currentCatalog.categorias));
+// Guardar todo el objeto en JSONBin
+async function guardarEnNube() {
+  dashboardMessage.textContent = 'Guardando cambios en la nube...';
+  try {
+    const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Master-Key': API_KEY
+      },
+      body: JSON.stringify(currentCatalog)
+    });
+
+    if (!res.ok) throw new Error('Error al guardar');
+    dashboardMessage.textContent = '¡Cambios guardados con éxito en la nube!';
+  } catch (e) {
+    dashboardMessage.textContent = 'Error al guardar cambios en la nube.';
+  }
 }
 
 function renderCategories(categories) {
@@ -122,14 +143,14 @@ function renderCategories(categories) {
     categoryList.append(item);
 
     const option = document.createElement('option');
-    option.value = category.nombre; // Guardamos el nombre como categoría para que coincida con la vista de cliente
+    option.value = category.nombre;
     option.textContent = category.nombre;
     productCategory.append(option.cloneNode(true));
     editProductCategory.append(option);
   }
 }
 
-function renderProducts(products, categories) {
+function renderProducts(products) {
   productList.replaceChildren();
   emptyProducts.hidden = products.length > 0;
 
@@ -177,7 +198,6 @@ function renderProducts(products, categories) {
   }
 }
 
-// Login directo en el cliente
 loginForm.addEventListener('submit', (event) => {
   event.preventDefault();
   formMessage.textContent = '';
@@ -190,34 +210,26 @@ loginForm.addEventListener('submit', (event) => {
     sessionStorage.setItem('admin_logged_in', 'true');
     loginForm.reset();
     showDashboard();
-    dashboardMessage.textContent = 'Sesión iniciada. Cargando catálogo...';
     loadCatalog();
-    dashboardMessage.textContent = 'Sesión iniciada. Puedes administrar tu catálogo.';
   } else {
     formMessage.textContent = 'Usuario o contraseña incorrectos.';
   }
 });
 
-// Agregar categoría
-categoryForm.addEventListener('submit', (event) => {
+categoryForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   const nombreCat = categoryInput.value.trim();
   if (!nombreCat) return;
 
-  const nuevaCat = {
-    id: Date.now(),
-    nombre: nombreCat
-  };
-
+  const nuevaCat = { id: Date.now(), nombre: nombreCat };
   currentCatalog.categorias.push(nuevaCat);
-  guardarEnStorage();
+
   categoryForm.reset();
-  loadCatalog();
-  dashboardMessage.textContent = `Categoría "${nombreCat}" agregada.`;
+  renderCategories(currentCatalog.categorias);
+  await guardarEnNube();
 });
 
-// Gestionar Acciones en Categorías (Editar / Eliminar)
-categoryList.addEventListener('click', (event) => {
+categoryList.addEventListener('click', async (event) => {
   const button = event.target.closest('button[data-action]');
   if (!button) return;
 
@@ -229,19 +241,17 @@ categoryList.addEventListener('click', (event) => {
     editCategoryId.value = String(category.id);
     editCategoryName.value = category.nombre;
     editCategoryDialog.showModal();
-    editCategoryName.focus();
     return;
   }
 
   if (!window.confirm(`¿Eliminar la categoría "${category.nombre}"?`)) return;
 
   currentCatalog.categorias = currentCatalog.categorias.filter(c => c.id !== catId);
-  guardarEnStorage();
-  loadCatalog();
-  dashboardMessage.textContent = `Categoría "${category.nombre}" eliminada.`;
+  renderCategories(currentCatalog.categorias);
+  await guardarEnNube();
 });
 
-editCategoryForm.addEventListener('submit', (event) => {
+editCategoryForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   const catId = Number(editCategoryId.value);
   const nuevoNombre = editCategoryName.value.trim();
@@ -249,14 +259,12 @@ editCategoryForm.addEventListener('submit', (event) => {
   const cat = currentCatalog.categorias.find(c => c.id === catId);
   if (cat) {
     cat.nombre = nuevoNombre;
-    guardarEnStorage();
     editCategoryDialog.close();
-    loadCatalog();
-    dashboardMessage.textContent = `Categoría actualizada con éxito.`;
+    renderCategories(currentCatalog.categorias);
+    await guardarEnNube();
   }
 });
 
-// Función auxiliar para convertir archivo de imagen a Base64
 function convertirImagenABase64(file) {
   return new Promise((resolve, reject) => {
     if (!file) {
@@ -270,7 +278,6 @@ function convertirImagenABase64(file) {
   });
 }
 
-// Agregar producto
 productForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   const submitButton = productForm.querySelector('button[type="submit"]');
@@ -295,10 +302,9 @@ productForm.addEventListener('submit', async (event) => {
     };
 
     currentCatalog.productos.push(nuevoProducto);
-    guardarEnStorage();
     productForm.reset();
-    loadCatalog();
-    dashboardMessage.textContent = `Producto "${nombre}" agregado correctamente.`;
+    renderProducts(currentCatalog.productos);
+    await guardarEnNube();
   } catch (error) {
     dashboardMessage.textContent = 'Error al procesar la imagen.';
   } finally {
@@ -306,8 +312,7 @@ productForm.addEventListener('submit', async (event) => {
   }
 });
 
-// Gestionar Acciones en Productos (Editar / Eliminar)
-productList.addEventListener('click', (event) => {
+productList.addEventListener('click', async (event) => {
   const button = event.target.closest('button[data-action]');
   if (!button) return;
 
@@ -323,16 +328,14 @@ productList.addEventListener('click', (event) => {
     editProductCategory.value = product.categoria;
     document.querySelector('#edit-product-image').value = '';
     editProductDialog.showModal();
-    document.querySelector('#edit-product-name').focus();
     return;
   }
 
   if (!window.confirm(`¿Eliminar el producto "${product.nombre}"?`)) return;
 
   currentCatalog.productos = currentCatalog.productos.filter(p => p.id !== prodId);
-  guardarEnStorage();
-  loadCatalog();
-  dashboardMessage.textContent = `Producto "${product.nombre}" eliminado.`;
+  renderProducts(currentCatalog.productos);
+  await guardarEnNube();
 });
 
 editProductForm.addEventListener('submit', async (event) => {
@@ -359,10 +362,9 @@ editProductForm.addEventListener('submit', async (event) => {
     product.categoria = categoria;
     product.imagen = imagenBase64;
 
-    guardarEnStorage();
     editProductDialog.close();
-    loadCatalog();
-    dashboardMessage.textContent = `Producto "${nombre}" actualizado correctamente.`;
+    renderProducts(currentCatalog.productos);
+    await guardarEnNube();
   } catch (error) {
     dashboardMessage.textContent = 'Error al actualizar el producto.';
   }
