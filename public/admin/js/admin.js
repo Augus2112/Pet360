@@ -3,7 +3,7 @@ const ADMIN_USER = "pet360admin";
 const ADMIN_PASS = "admin123";
 
 // URL de la API de SheetDB
-const SHEETDB_URL = 'https://sheetdb.io/api/v1/41n1o2132w6nd';
+const SHEETDB_URL = 'https://sheetdb.io/api/v1/xqcm1sjvwwpno';
 
 let productos = [];
 let categorias = [];
