@@ -3,6 +3,8 @@ let categorias = [];
 let carrito = [];
 let categoriaActual = 'todos';
 let toastTimeout;
+let catalogoCargado = false;
+let cargaEnCurso = false;
 
 // Elementos del DOM
 const productsGrid = document.getElementById('productsGrid');
@@ -36,8 +38,25 @@ document.addEventListener('DOMContentLoaded', () => {
     configurarEventos();
 });
 
-async function cargarProductos() {
-    productsGrid.innerHTML = '<p style="grid-column: 1/-1; text-align: center; color: #64748b; padding: 2rem;">Cargando catálogo...</p>';
+document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+        cargarProductos({ silencioso: true });
+    }
+});
+
+setInterval(() => {
+    if (!document.hidden) {
+        cargarProductos({ silencioso: true });
+    }
+}, 30000);
+
+async function cargarProductos({ silencioso = false } = {}) {
+    if (cargaEnCurso) return;
+    cargaEnCurso = true;
+
+    if (!silencioso) {
+        productsGrid.innerHTML = '<p style="grid-column: 1/-1; text-align: center; color: #64748b; padding: 2rem;">Cargando catálogo...</p>';
+    }
 
     try {
         const response = await fetch('/api/catalogo', { cache: 'no-store' });
@@ -51,19 +70,27 @@ async function cargarProductos() {
         }
 
         categorias = catalogo.categorias;
+        if (categoriaActual !== 'todos' && !categorias.some(categoria => String(categoria.id) === categoriaActual)) {
+            categoriaActual = 'todos';
+        }
         const nombresCategorias = new Map(categorias.map(categoria => [categoria.id, categoria.nombre]));
         productos = catalogo.productos.map(producto => ({
             ...producto,
             categoria: nombresCategorias.get(producto.categoriaId) || 'Sin categoría'
         }));
 
+        catalogoCargado = true;
         renderizarCategorias();
         filtrarYMostrarProductos();
     } catch (error) {
+        if (silencioso && catalogoCargado) return;
+
         productos = [];
         categorias = [];
         renderizarCategorias();
         productsGrid.innerHTML = `<p style="grid-column: 1/-1; text-align: center; color: #64748b; padding: 2rem;">${escapeHTML(error.message || 'No se pudo conectar con el catálogo.')}</p>`;
+    } finally {
+        cargaEnCurso = false;
     }
 }
 
